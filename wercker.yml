@@ -1,9 +1,8 @@
 box: ubuntu
 build:
   steps:
-    - wercker/setup-go-workspace:
-      package-dir: github.com/nmi/tiny_x86_emu
-    - wercker/golint
+    - bundle-install:
+        cwd: ~/go/src/github.com/nmi/tiny_x86_emu
     - script:
         name: init
         code: |
