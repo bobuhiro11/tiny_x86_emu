@@ -7,7 +7,7 @@ build:
         name: init
         code: |
           sudo apt-get update
-          sudo apt-get install -y nasm gcc git tar wget
+          sudo apt-get install -y nasm gcc git tar wget make
           wget https://dl.google.com/go/go1.10.linux-amd64.tar.gz
           sudo tar -C /usr/local -zxf go1.10.linux-amd64.tar.gz
     - script:
@@ -25,19 +25,13 @@ build:
           go get -u github.com/mattn/goveralls
           go get -u github.com/goreleaser/goreleaser
           go get -u github.com/golang/dep/...
+          go get -u github.com/golang/lint/golint
           dep ensure -v
     - script:
         name: go build
         code: |
-          go build ./...
+          make tiny_x68_emu
     - script:
         name: go test
         code: |
-          go test $(go list ./... | grep -v /vendor/) --cover
-          # goveralls -repotoken $COVERALL_REPO_TOKEN
-    - script:
-        name: go lint
-        code: |
-          go get -u github.com/golang/lint/golint
-          go vet $(go list ./... | grep -v /vendor/)
-          golint $(go list ./... | grep -v /vendor/)
+          make test
