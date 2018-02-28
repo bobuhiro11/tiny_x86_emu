@@ -4,9 +4,9 @@ build:
     - script:
         name: init
         code: |
+          sudo apt-get update
           sudo apt-get install -y software-properties-common python-software-properties
           sudo apt-add-repository -y ppa:gophers/archive
-          sudo apt-get update
           sudo apt-get install -y nasm gcc git golang-go
           uname -a
           gcc --version
