@@ -8,6 +8,9 @@ build:
           sudo apt-get install -y nasm gcc git tar wget
           wget https://dl.google.com/go/go1.10.linux-amd64.tar.gz
           sudo tar -C /usr/local -zxf go1.10.linux-amd64.tar.gz
+    - script:
+        name: check dependencies
+        code: |
           go version
           uname -a
           gcc --version
