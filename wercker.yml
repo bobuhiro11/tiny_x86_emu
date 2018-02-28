@@ -5,7 +5,7 @@ build:
         name: init
         code: |
           sudo apt-get update
-          sudo apt-get install -y nasm golang gcc
+          sudo apt-get install -y nasm golang gcc git
           uname -a
           gcc --version
           objdump --version
