@@ -1,6 +1,6 @@
 builds:
   - binary: tiny_x86_emu
-    main: cli/main.go
+    main: tiny_x86_emu/main.go
     goos:
       - darwin
       - windows
