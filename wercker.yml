@@ -2,7 +2,7 @@ box: ubuntu
 build:
   steps:
     - wercker/setup-go-workspace:
-      package-dir: github.com/nmi/tiny_x68_emu
+      package-dir: github.com/nmi/tiny_x86_emu
     - script:
         name: init
         code: |
@@ -30,7 +30,7 @@ build:
     - script:
         name: go build
         code: |
-          make tiny_x68_emu
+          make tiny_x86_emu
     - script:
         name: go test
         code: |
