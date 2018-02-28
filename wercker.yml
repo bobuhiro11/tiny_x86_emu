@@ -20,6 +20,7 @@ build:
     - script:
         name: go get
         code: |
+          cd $WERCKER_ROOT; pwd 
           go get -u github.com/mattn/goveralls
           go get -u github.com/goreleaser/goreleaser
           go get -u github.com/golang/dep/...
@@ -27,15 +28,18 @@ build:
     - script:
         name: go build
         code: |
+          cd $WERCKER_ROOT; pwd 
           go build ./...
     - script:
         name: go test
         code: |
+          cd $WERCKER_ROOT; pwd 
           go test $(go list ./... | grep -v /vendor/) --cover
           # goveralls -repotoken $COVERALL_REPO_TOKEN
     - script:
         name: go lint
         code: |
+          cd $WERCKER_ROOT; pwd 
           go get -u github.com/golang/lint/golint
           go vet $(go list ./... | grep -v /vendor/)
           golint $(go list ./... | grep -v /vendor/)
