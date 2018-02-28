@@ -9,7 +9,7 @@ build:
           uname -a
           gcc --version
           objdump --version
-          nasm --version
+          nasm -v
           ndisasm -v
     - script:
         name: go get
