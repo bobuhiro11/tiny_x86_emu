@@ -1,5 +1,4 @@
-box:
-  id: golang
+box: ubuntu
 build:
   steps:
     - wercker/setup-go-workspace:
@@ -8,6 +7,8 @@ build:
     - script:
         name: init
         code: |
+          sudo apt-get update
+          sudo apt-get install -y nasm golang gcc
           uname -a
           gcc --version
           objdump --version
