@@ -9,7 +9,10 @@ build:
         name: init
         code: |
           uname -a
-          sudo apt-get install -y gcc nasm
+          gcc --version
+          objdump --version
+          nasm --version
+          ndisasm -v
     - script:
         name: go get
         code: |
