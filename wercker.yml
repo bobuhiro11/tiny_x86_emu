@@ -5,16 +5,18 @@ build:
         name: init
         code: |
           sudo apt-get update
-          sudo apt-get install -y software-properties-common python-software-properties
-          sudo apt-add-repository -y ppa:gophers/archive
-          sudo apt-get update
-          sudo apt-get install -y nasm gcc git golang-1.9-go
+          sudo apt-get install -y nasm gcc git
           go version
           uname -a
           gcc --version
           objdump --version
           nasm -v
           ndisasm -v
+    - script:
+        name: install golang
+        code: |
+          wget https://dl.google.com/go/go1.10.linux-amd64.tar.gz
+          sudo tar -C /usr/local -zxf go1.10.linux-amd64.tar.gz
     - script:
         name: go get
         code: |
