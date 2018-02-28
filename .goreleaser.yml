@@ -1,0 +1,12 @@
+builds:
+  - binary: tiny_x86_emu
+    main: cli/main.go
+    goos:
+      - darwin
+      - windows
+      - linux
+    goarch:
+      - amd64
+      - 386
+release:
+  draft: true
