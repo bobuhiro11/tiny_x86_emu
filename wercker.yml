@@ -30,7 +30,7 @@ build:
     - script:
         name: go build
         code: |
-          make tiny_x86_emu
+          make build
     - script:
         name: go test
         code: |
