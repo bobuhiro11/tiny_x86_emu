@@ -25,7 +25,6 @@ var (
 )
 
 func update(screen *ebiten.Image) error {
-	time.Sleep(30 * time.Millisecond)
 	for i := 0; i < width*height; i++ {
 		vram.Pix[4*i] = uint8(rand.Int() & 0xFF)
 		vram.Pix[4*i+1] = uint8(rand.Int() & 0xFF)
@@ -63,36 +62,34 @@ func main() {
 		e.memory[i] = bytes[i]
 	}
 
+	// emulate
+	chFinished := make(chan bool)
+	go func(chFinished chan bool) {
+		time.Sleep(3000 * time.Millisecond)
+		for e.eip < 10000 {
+			err := e.exec_inst()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(1)
+			}
+
+			if e.eip == 0 {
+				fmt.Println("End of program")
+				e.dump()
+				break
+			}
+		}
+		chFinished <- true
+	}(chFinished)
+
 	// setup gui
 	fmt.Printf("enable GUI = %#v\n", *enableGUI)
-	chFinished := make(chan bool)
 	if *enableGUI {
-		go func(chFinished chan bool) {
-			err := ebiten.Run(update, width, height, 2, "x86 emulator")
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			chFinished <- true
-		}(chFinished)
-	}
-
-	// emulate
-	for e.eip < 10000 {
-		err := e.exec_inst()
+		err := ebiten.Run(update, width, height, 2, "x86 emulator")
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(1)
+			log.Fatal(err.Error())
 		}
-
-		if e.eip == 0 {
-			fmt.Println("End of program")
-			e.dump()
-			break
-		}
-	}
-
-	if *enableGUI {
-		// wait for window closed
+	} else {
 		<-chFinished
 	}
 }
