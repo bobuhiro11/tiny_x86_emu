@@ -24,6 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
+ignored = ["github.com/go-gl/glfw/v3.2/glfw"]
 
 [prune]
   go-tests = true
@@ -32,3 +33,4 @@
 [[constraint]]
   name = "github.com/fatih/color"
   version = "1.6.0"
+

@@ -26,9 +26,9 @@ type Emulator struct {
 
 func NewEmulator(memory_size, eip, esp uint32) *Emulator {
 	return &Emulator{
-		e.memory: make([]uint8, memory_size),
-		e.eip:    eip,
-		e.esp:    esp,
+		memory: make([]uint8, memory_size),
+		eip:    eip,
+		esp:    esp,
 	}
 }
 
