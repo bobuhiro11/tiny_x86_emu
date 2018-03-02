@@ -89,9 +89,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-	} else {
-		<-chFinished
 	}
+	<-chFinished
 }
 
 func loadFile(filename string) ([]byte, error) {
