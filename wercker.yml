@@ -22,12 +22,13 @@ build:
     - script:
         name: go get
         code: |
-          go get -u github.com/mattn/goveralls
-          go get -u github.com/goreleaser/goreleaser
-          go get -u github.com/golang/dep/...
-          go get -u github.com/golang/lint/golint
+          go get -u -v github.com/mattn/goveralls
+          go get -u -v github.com/goreleaser/goreleaser
+          go get -u -v github.com/golang/dep/...
+          go get -u -v github.com/golang/lint/golint
           # glfw cannot be managed by dep
-          go get -u github.com/go-gl/glfw/v3.2/glfw/...
+          go get -u -v github.com/go-gl/glfw/v3.2/glfw/...
+          go get -u -v github.com/go-gl/gl/v2.1/gl/...
     - script:
         name: dep ensure
         code: |
