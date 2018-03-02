@@ -9,18 +9,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/go-gl/gl"
-  packages = ["v2.1/gl"]
-  revision = "ac0d3d2af0fe995e2bb09fa6619b716b0c0fc0fa"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/go-gl/glfw"
-  packages = ["v3.2/glfw"]
-  revision = "513e4f2bf85c31fba0fc4907abd7895242ccbe50"
-
-[[projects]]
-  branch = "master"
   name = "github.com/gopherjs/gopherjs"
   packages = [
     "js",
