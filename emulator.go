@@ -35,11 +35,11 @@ type Emulator struct {
 }
 
 func NewEmulator(memory_size, eip, esp uint32) *Emulator {
-	e := Emulator{}
-	e.memory = make([]uint8, memory_size)
-	e.eip = eip
-	e.esp = esp
-	return &e
+	return &Emulator{
+		e.memory: make([]uint8, memory_size),
+		e.eip:    eip,
+		e.esp:    esp,
+	}
 }
 
 // emulate instruction
