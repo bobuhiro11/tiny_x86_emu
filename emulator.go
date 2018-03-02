@@ -17,21 +17,11 @@ const (
 )
 
 type Emulator struct {
-
-	// general registers
-	registers [8]uint32
-
-	// eflags
-	eflags uint32
-
-	// physical memory
-	memory []uint8
-
-	// program counter
-	eip uint32
-
-	// stack pointer
-	esp uint32 // #reg = 4
+	registers [8]uint32 // general registers
+	eflags    uint32    // eflags
+	memory    []uint8   // physical memory
+	eip       uint32    // program counter
+	esp       uint32    // stack pointer (#reg = 4)
 }
 
 func NewEmulator(memory_size, eip, esp uint32) *Emulator {
