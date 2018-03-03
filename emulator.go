@@ -44,7 +44,7 @@ func (e *Emulator) exec_inst() error {
 		e.mov_rm32_r32()
 	case 0x8B:
 		e.mov_r32_rm32()
-	case 0x07:
+	case 0xC7:
 		e.mov_rm32_imm32()
 	case 0xEB:
 		e.short_jmp()
@@ -77,6 +77,7 @@ func (e *Emulator) code_83() {
 	sub_rm32_imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.get_rm32(m)
 		imm8 := uint32(e.get_sign_code8(0))
+		e.eip++
 		e.set_rm32(m, rm32-imm8)
 	}
 	e.eip++
@@ -231,6 +232,7 @@ func (e *Emulator) dump() {
 		"ECP=0x%08x "+
 		"EDP=0x%08x\n"+
 		"ESI=0x%08x "+
+		"EDI=0x%08x "+
 		"EBP=0x%08x "+
 		"ESP=0x%08x "+
 		"EIP=0x%08x\n",
@@ -239,6 +241,7 @@ func (e *Emulator) dump() {
 		e.registers[ECX],
 		e.registers[EDX],
 		e.registers[ESI],
+		e.registers[EDI],
 		e.registers[EBP],
 		e.esp,
 		e.eip,
