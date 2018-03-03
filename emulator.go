@@ -44,12 +44,16 @@ func (e *Emulator) exec_inst() error {
 		e.mov_rm32_r32()
 	case 0x8B:
 		e.mov_r32_rm32()
+	case 0xC3:
+		e.ret()
 	case 0xC7:
 		e.mov_rm32_imm32()
 	case 0xEB:
 		e.short_jmp()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
 		e.mov_r32_imm32()
+	case 0xE8:
+		e.call_rel32()
 	case 0xFF:
 		e.code_ff()
 	default:
@@ -130,6 +134,32 @@ func (e *Emulator) mov_r32_rm32() {
 func (e *Emulator) short_jmp() {
 	diff := uint32(e.get_sign_code8(1))
 	e.eip += diff + uint32(2)
+}
+
+func (e *Emulator) push_r32() {
+	reg := e.get_code8(0) - 0x05
+	e.push32(e.get_register32(reg))
+	e.eip++
+}
+
+func (e *Emulator) pop_r32() {
+	reg := e.get_code8(0) - 0x05
+	e.set_register32(reg, e.pop32())
+	e.eip++
+}
+
+func (e *Emulator) call_rel32() {
+	diff := e.get_singed_code32(1)
+	e.push32(e.eip + 5)
+	if diff < 0 {
+		e.eip = e.eip - uint32(-diff) + uint32(5)
+	} else {
+		e.eip = e.eip + uint32(diff) + uint32(5)
+	}
+}
+
+func (e *Emulator) ret() {
+	e.eip = e.pop32()
 }
 
 // util
@@ -220,6 +250,18 @@ func (e *Emulator) get_memory32(address uint32) uint32 {
 		ret |= uint32(e.get_memory8(address+i)) << uint32(i*8)
 	}
 	return ret
+}
+
+func (e *Emulator) push32(value uint32) {
+	address := e.esp - 4
+	e.set_memory32(address, value)
+	e.esp = address
+}
+
+func (e *Emulator) pop32() uint32 {
+	value := e.get_memory32(e.esp)
+	e.esp += 4
+	return value
 }
 
 func (e *Emulator) dump() {
