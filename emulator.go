@@ -134,13 +134,12 @@ func (e *Emulator) mov_r32_rm32() {
 }
 
 func (e *Emulator) short_jmp() {
-	diff := uint32(e.get_sign_code8(1))
-	e.eip += diff + uint32(2)
-	// if diff < 0 {
-	// 	e.eip = e.eip + uint32(-diff) + uint32(2)
-	// } else {
-	// 	e.eip = e.eip + uint32(diff) + uint32(2)
-	// }
+	diff := int32(e.get_sign_code8(1))
+	if diff < 0 {
+		e.eip = e.eip - uint32(-diff) + uint32(2)
+	} else {
+		e.eip = e.eip + uint32(diff) + uint32(2)
+	}
 }
 
 func (e *Emulator) jmp_rel32() {
