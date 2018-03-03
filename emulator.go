@@ -54,6 +54,8 @@ func (e *Emulator) exec_inst() error {
 		e.mov_r32_imm32()
 	case 0xE8:
 		e.call_rel32()
+	case 0xE9:
+		e.jmp_rel32()
 	case 0xFF:
 		e.code_ff()
 	default:
@@ -134,6 +136,20 @@ func (e *Emulator) mov_r32_rm32() {
 func (e *Emulator) short_jmp() {
 	diff := uint32(e.get_sign_code8(1))
 	e.eip += diff + uint32(2)
+	// if diff < 0 {
+	// 	e.eip = e.eip + uint32(-diff) + uint32(2)
+	// } else {
+	// 	e.eip = e.eip + uint32(diff) + uint32(2)
+	// }
+}
+
+func (e *Emulator) jmp_rel32() {
+	diff := e.get_sign_code32(1)
+	if diff < 0 {
+		e.eip = e.eip - uint32(-diff) + uint32(5)
+	} else {
+		e.eip = e.eip + uint32(diff) + uint32(5)
+	}
 }
 
 func (e *Emulator) push_r32() {
@@ -277,7 +293,7 @@ func (e *Emulator) dump() {
 		"EDI=0x%08x "+
 		"EBP=0x%08x "+
 		"ESP=0x%08x "+
-		"EIP=0x%08x\n",
+		"EIP=0x%08x ",
 		e.registers[EAX],
 		e.registers[EBX],
 		e.registers[ECX],
@@ -288,6 +304,8 @@ func (e *Emulator) dump() {
 		e.esp,
 		e.eip,
 	)
+	color.New(color.FgGreen).Printf("(opecode=%x)\n",
+		e.get_code8(0))
 }
 
 // get text segment
@@ -304,6 +322,10 @@ func (e *Emulator) get_code8(index int32) uint8 {
 
 func (e *Emulator) get_sign_code8(index int32) int8 {
 	return int8(e.get_code8(index))
+}
+
+func (e *Emulator) get_sign_code32(index int32) int32 {
+	return int32(e.get_code32(index))
 }
 
 func (e *Emulator) get_code32(index int32) uint32 {

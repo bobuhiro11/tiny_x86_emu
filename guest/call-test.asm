@@ -5,7 +5,8 @@ start:
   mov ebx, 0x29
   call add_routine
   jmp short start
+  jmp 0
 add_routine:
   mov ecx, eax
-  add ecx, ebx # ecx = 0x011a
+  add ecx, ebx ; ecx = 0x011a
   ret

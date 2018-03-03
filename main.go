@@ -75,7 +75,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			if e.eip == 0x7c00 {
+			if e.eip == 0 || e.eip == 0x7c00 {
 				break
 			}
 		}
