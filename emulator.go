@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/fatih/color"
-	"strconv"
 )
 
 const (
@@ -36,14 +36,24 @@ func NewEmulator(memory_size, eip, esp uint32) *Emulator {
 
 func (e *Emulator) exec_inst() error {
 	switch e.get_code8(0) {
+	case 0x01:
+		e.add_rm32_r32()
+	case 0x83:
+		e.code_83()
+	case 0x89:
+		e.mov_rm32_r32()
+	case 0x8B:
+		e.mov_r32_rm32()
 	case 0x07:
 		e.mov_rm32_imm32()
 	case 0xEB:
 		e.short_jmp()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
 		e.mov_r32_imm32()
+	case 0xFF:
+		e.code_ff()
 	default:
-		return errors.New(strconv.Itoa(int(e.get_code8(0))) + " is not implemented.")
+		return errors.New(fmt.Sprintf("opecode = %x", e.get_code8(0)) + " is not implemented.")
 	}
 	return nil
 }
@@ -63,6 +73,59 @@ func (e *Emulator) mov_rm32_imm32() {
 	e.set_rm32(m, value)
 }
 
+func (e *Emulator) code_83() {
+	sub_rm32_imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.get_rm32(m)
+		imm8 := uint32(e.get_sign_code8(0))
+		e.set_rm32(m, rm32-imm8)
+	}
+	e.eip++
+	m := e.parseModRM()
+	switch m.opecode {
+	case 5:
+		sub_rm32_imm8(e, m)
+	default:
+		panic("not implemented")
+	}
+}
+
+func (e *Emulator) code_ff() {
+	inc_rm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.get_rm32(m)
+		e.set_rm32(m, rm32+1)
+	}
+	e.eip++
+	m := e.parseModRM()
+	switch m.opecode {
+	case 0:
+		inc_rm32(e, m)
+	default:
+		panic("not implemented")
+	}
+}
+
+func (e *Emulator) mov_rm32_r32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.get_r32(m)
+	e.set_rm32(m, r32)
+}
+
+func (e *Emulator) add_rm32_r32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.get_r32(m)
+	rm32 := e.get_rm32(m)
+	e.set_rm32(m, r32+rm32)
+}
+
+func (e *Emulator) mov_r32_rm32() {
+	e.eip++
+	m := e.parseModRM()
+	rm32 := e.get_rm32(m)
+	e.set_r32(m, rm32)
+}
+
 func (e *Emulator) short_jmp() {
 	diff := uint32(e.get_sign_code8(1))
 	e.eip += diff + uint32(2)
@@ -76,6 +139,23 @@ func (e *Emulator) set_rm32(m ModRM, value uint32) {
 		address := e.calc_memory_address(m)
 		e.set_memory32(address, value)
 	}
+}
+
+func (e *Emulator) get_rm32(m ModRM) uint32 {
+	if m.mod == 3 {
+		return e.get_register32(m.rm)
+	} else {
+		address := e.calc_memory_address(m)
+		return e.get_memory32(address)
+	}
+}
+
+func (e *Emulator) get_r32(m ModRM) uint32 {
+	return e.get_register32(m.opecode)
+}
+
+func (e *Emulator) set_r32(m ModRM, value uint32) {
+	e.set_register32(m.opecode, value)
 }
 
 func (e *Emulator) calc_memory_address(m ModRM) uint32 {
@@ -129,24 +209,39 @@ func (e *Emulator) set_memory32(address, value uint32) {
 	}
 }
 
+func (e *Emulator) get_memory8(address uint32) uint8 {
+	return e.memory[address]
+}
+
+func (e *Emulator) get_memory32(address uint32) uint32 {
+	var ret uint32
+	for i := uint32(0); i < 4; i++ {
+		ret |= uint32(e.get_memory8(address+i)) << uint32(i*8)
+	}
+	return ret
+}
+
 func (e *Emulator) dump() {
+	color.New(color.FgBlack).Printf("" +
+		"-------------------------------" +
+		"-----------------------------\n")
 	color.New(color.FgCyan).Printf(""+
-		"eap=0x%x,%d "+
-		"ebp=0x%x,%d "+
-		"ecp=0x%x,%d "+
-		"edp=0x%x,%d "+
-		"esi=0x%x,%d "+
-		"ebp=0x%x,%d "+
-		"esp=0x%x,%d "+
-		"eip=0x%x,%d\n",
-		e.registers[EAX], e.registers[EAX],
-		e.registers[EBX], e.registers[EBX],
-		e.registers[ECX], e.registers[ECX],
-		e.registers[EDX], e.registers[EDX],
-		e.registers[ESI], e.registers[ESI],
-		e.registers[EBP], e.registers[EBP],
-		e.esp, e.esp,
-		e.eip, e.eip,
+		"EAP=0x%08x "+
+		"EBP=0x%08x "+
+		"ECP=0x%08x "+
+		"EDP=0x%08x\n"+
+		"ESI=0x%08x "+
+		"EBP=0x%08x "+
+		"ESP=0x%08x "+
+		"EIP=0x%08x\n",
+		e.registers[EAX],
+		e.registers[EBX],
+		e.registers[ECX],
+		e.registers[EDX],
+		e.registers[ESI],
+		e.registers[EBP],
+		e.esp,
+		e.eip,
 	)
 }
 
@@ -218,7 +313,7 @@ func (e *Emulator) parseModRM() ModRM {
 	if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
 		m.disp32 = e.get_code32(0) // Is this a bug on the book?
 		e.eip += 4
-	} else {
+	} else if m.mod == 1 {
 		m.setDisp8(e.get_sign_code8(0))
 		e.eip++
 	}

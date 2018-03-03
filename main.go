@@ -12,7 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"time"
+	// "time"
 )
 
 const (
@@ -54,36 +54,37 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	fmt.Printf("bytes =\n%s\n", hex.Dump(bytes))
+	fmt.Printf("enable GUI = %#v\n", *enableGUI)
+	fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
-	e := NewEmulator(10000, 0, 100)
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00)
 	for i := 0; i < len(bytes); i++ {
-		e.memory[i] = bytes[i]
+		e.memory[i+0x7c00] = bytes[i]
 	}
 
 	// emulate
 	chFinished := make(chan bool)
 	go func(chFinished chan bool) {
-		time.Sleep(3000 * time.Millisecond)
-		for e.eip < 10000 {
+		// time.Sleep(3000 * time.Millisecond)
+		for e.eip < 0x7c00+0x10000 {
+			e.dump()
 			err := e.exec_inst()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
 				os.Exit(1)
 			}
 
-			if e.eip == 0 {
-				fmt.Println("End of program")
-				e.dump()
+			if e.eip == 0x7c00 {
 				break
 			}
 		}
+		e.dump()
+		fmt.Println("End of program")
 		chFinished <- true
 	}(chFinished)
 
 	// setup gui
-	fmt.Printf("enable GUI = %#v\n", *enableGUI)
 	if *enableGUI {
 		err := ebiten.Run(update, width, height, 2, "x86 emulator")
 		if err != nil {
