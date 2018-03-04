@@ -53,8 +53,14 @@ func (e *Emulator) exec_inst() error {
 		e.pop_r32()
 	case 0x6a:
 		e.push_imm8()
+	case 0x74:
+		e.jng()
 	case 0x78:
 		e.js()
+	case 0x7E:
+		e.jng()
+	case 0x7F:
+		e.jg()
 	case 0x83:
 		e.code_83()
 	case 0x89:
@@ -243,6 +249,22 @@ func (e *Emulator) jns() {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	}
+}
+
+func (e *Emulator) jg() {
+	if e.get_eflag(ZERO_FLAG) && e.get_eflag(SIGN_FLAG) == e.get_eflag(OVERFLOW_FLAG) {
+		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	} else {
+		e.eip += uint32(2)
+	}
+}
+
+func (e *Emulator) jng() {
+	if e.get_eflag(ZERO_FLAG) || e.get_eflag(SIGN_FLAG) != e.get_eflag(OVERFLOW_FLAG) {
+		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	} else {
+		e.eip += uint32(2)
 	}
 }
 
