@@ -58,7 +58,7 @@ func main() {
 	fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00)
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true)
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}

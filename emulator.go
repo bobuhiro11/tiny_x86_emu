@@ -17,18 +17,20 @@ const (
 )
 
 type Emulator struct {
-	registers [8]uint32 // general registers
-	eflags    uint32    // eflags
-	memory    []uint8   // physical memory
-	eip       uint32    // program counter
-	esp       uint32    // stack pointer (#reg = 4)
+	registers   [8]uint32 // general registers
+	eflags      uint32    // eflags
+	memory      []uint8   // physical memory
+	eip         uint32    // program counter
+	esp         uint32    // stack pointer (#reg = 4)
+	is32bitmode bool      // if this value is false, the enulator work as 16 bit mode
 }
 
-func NewEmulator(memory_size, eip, esp uint32) *Emulator {
+func NewEmulator(memory_size, eip, esp uint32, is32bitmode bool) *Emulator {
 	return &Emulator{
-		memory: make([]uint8, memory_size),
-		eip:    eip,
-		esp:    esp,
+		memory:      make([]uint8, memory_size),
+		eip:         eip,
+		esp:         esp,
+		is32bitmode: is32bitmode,
 	}
 }
 
@@ -38,6 +40,10 @@ func (e *Emulator) exec_inst() error {
 	switch e.get_code8(0) {
 	case 0x01:
 		e.add_rm32_r32()
+	case 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57:
+		e.push_r32()
+	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
+		e.pop_r32()
 	case 0x83:
 		e.code_83()
 	case 0x89:
@@ -48,6 +54,8 @@ func (e *Emulator) exec_inst() error {
 		e.ret()
 	case 0xC7:
 		e.mov_rm32_imm32()
+	case 0xC9:
+		e.leave()
 	case 0xEB:
 		e.short_jmp()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
@@ -86,13 +94,21 @@ func (e *Emulator) code_83() {
 		e.eip++
 		e.set_rm32(m, rm32-imm8)
 	}
+	add_rm32_imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.get_rm32(m)
+		imm8 := uint32(e.get_sign_code8(0))
+		e.eip++
+		e.set_rm32(m, rm32+imm8)
+	}
 	e.eip++
 	m := e.parseModRM()
 	switch m.opecode {
+	case 0:
+		add_rm32_imm8(e, m)
 	case 5:
 		sub_rm32_imm8(e, m)
 	default:
-		panic("not implemented")
+		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented")
 	}
 }
 
@@ -152,13 +168,13 @@ func (e *Emulator) jmp_rel32() {
 }
 
 func (e *Emulator) push_r32() {
-	reg := e.get_code8(0) - 0x05
+	reg := e.get_code8(0) - 0x50
 	e.push32(e.get_register32(reg))
 	e.eip++
 }
 
 func (e *Emulator) pop_r32() {
-	reg := e.get_code8(0) - 0x05
+	reg := e.get_code8(0) - 0x58
 	e.set_register32(reg, e.pop32())
 	e.eip++
 }
@@ -279,24 +295,31 @@ func (e *Emulator) pop32() uint32 {
 	return value
 }
 
+func (e *Emulator) leave() {
+	ebp := e.get_register32(EBP)
+	e.esp = ebp
+	e.set_register32(EBP, e.pop32())
+	e.eip++
+}
+
 func (e *Emulator) dump() {
 	color.New(color.FgBlack).Printf("" +
 		"-------------------------------" +
 		"-----------------------------\n")
 	color.New(color.FgCyan).Printf(""+
-		"EAP=0x%08x "+
-		"EBP=0x%08x "+
-		"ECP=0x%08x "+
-		"EDP=0x%08x\n"+
-		"ESI=0x%08x "+
+		"EAX=0x%08x "+
+		"ECX=0x%08x "+
+		"EDX=0x%08x "+
+		"EBX=0x%08x "+
+		"ESI=0x%08x\n"+
 		"EDI=0x%08x "+
 		"EBP=0x%08x "+
 		"ESP=0x%08x "+
 		"EIP=0x%08x ",
 		e.registers[EAX],
-		e.registers[EBX],
 		e.registers[ECX],
 		e.registers[EDX],
+		e.registers[EBX],
 		e.registers[ESI],
 		e.registers[EDI],
 		e.registers[EBP],
