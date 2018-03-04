@@ -14,6 +14,11 @@ const (
 	EBP = 5
 	ESI = 6
 	EDI = 7
+
+	CARRY_FLAG    = 1 << 0
+	ZERO_FLAG     = 1 << 6
+	SIGN_FLAG     = 1 << 7
+	OVERFLOW_FLAG = 1 << 11
 )
 
 type Emulator struct {
@@ -48,6 +53,8 @@ func (e *Emulator) exec_inst() error {
 		e.pop_r32()
 	case 0x6a:
 		e.push_imm8()
+	case 0x78:
+		e.js()
 	case 0x83:
 		e.code_83()
 	case 0x89:
@@ -168,8 +175,8 @@ func (e *Emulator) cmp_r32_rm32() {
 	e.eip++
 	m := e.parseModRM()
 	r32 := e.get_r32(m)
-	rm32 := e.get_rm(m)
-	result = uint64(r32) - uint64(rm32)
+	rm32 := e.get_rm32(m)
+	result := uint64(r32) - uint64(rm32)
 	e.update_eflags_sub(r32, rm32, result)
 }
 
@@ -221,6 +228,38 @@ func (e *Emulator) call_rel32() {
 
 func (e *Emulator) ret() {
 	e.eip = e.pop32()
+}
+
+func (e *Emulator) js() {
+	if e.get_eflag(SIGN_FLAG) {
+		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	} else {
+		e.eip += uint32(2)
+	}
+}
+
+func (e *Emulator) jns() {
+	if e.get_eflag(SIGN_FLAG) {
+		e.eip += uint32(2)
+	} else {
+		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	}
+}
+
+func (e *Emulator) jl() {
+	if e.get_eflag(SIGN_FLAG) != e.get_eflag(OVERFLOW_FLAG) {
+		e.eip += uint32(e.get_sign_code8(1))
+	} else {
+		e.eip += 2
+	}
+}
+
+func (e *Emulator) jle() {
+	if e.get_eflag(ZERO_FLAG) || e.get_eflag(SIGN_FLAG) != e.get_eflag(OVERFLOW_FLAG) {
+		e.eip += uint32(e.get_sign_code8(1))
+	} else {
+		e.eip += 2
+	}
 }
 
 // util
@@ -390,6 +429,29 @@ func (e *Emulator) get_code32(index int32) uint32 {
 
 func (e *Emulator) get_singed_code32(index int32) int32 {
 	return int32(e.get_code32(index))
+}
+
+func (e *Emulator) update_eflags_sub(v1, v2 uint32, result uint64) {
+	sign1 := (v1 >> 31) & 0x01
+	sign2 := (v2 >> 31) & 0x01
+	signr := uint32((result >> 31) & 0x01)
+
+	e.set_eflag(CARRY_FLAG, result>>32 != 0)
+	e.set_eflag(ZERO_FLAG, result == 0)
+	e.set_eflag(SIGN_FLAG, signr != 0)
+	e.set_eflag(OVERFLOW_FLAG, sign1 != sign2 && sign1 != signr)
+}
+
+func (e *Emulator) set_eflag(flag uint32, cond bool) {
+	if cond {
+		e.eflags |= flag
+	} else {
+		e.eflags &= ^flag
+	}
+}
+
+func (e *Emulator) get_eflag(flag uint32) bool {
+	return e.eflags&flag != 0
 }
 
 // modrm
