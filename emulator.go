@@ -44,6 +44,8 @@ func (e *Emulator) exec_inst() error {
 		e.push_r32()
 	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
 		e.pop_r32()
+	case 0x6a:
+		e.push_imm8()
 	case 0x83:
 		e.code_83()
 	case 0x89:
@@ -177,6 +179,12 @@ func (e *Emulator) pop_r32() {
 	reg := e.get_code8(0) - 0x58
 	e.set_register32(reg, e.pop32())
 	e.eip++
+}
+
+func (e *Emulator) push_imm8() {
+	value := uint32(e.get_code8(1))
+	e.push32(value)
+	e.eip += 2
 }
 
 func (e *Emulator) call_rel32() {

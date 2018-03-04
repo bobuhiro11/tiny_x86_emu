@@ -1,5 +1,6 @@
+int add(int a, int b) {
+    return a + b;
+}
 int main(void) {
-    int val = 40;
-    val++;
-    return val;
+    return add(2, 5);
 }
