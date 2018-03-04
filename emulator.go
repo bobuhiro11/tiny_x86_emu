@@ -44,14 +44,16 @@ type Emulator struct {
 	eip         uint32    // program counter
 	esp         uint32    // stack pointer (#reg = 4)
 	is32bitmode bool      // if this value is false, the enulator work as 16 bit mode
+	isSilent    bool      // silent mode
 }
 
-func NewEmulator(memory_size, eip, esp uint32, is32bitmode bool) *Emulator {
+func NewEmulator(memory_size, eip, esp uint32, is32bitmode, isSilent bool) *Emulator {
 	return &Emulator{
 		memory:      make([]uint8, memory_size),
 		eip:         eip,
 		esp:         esp,
 		is32bitmode: is32bitmode,
+		isSilent:    isSilent,
 	}
 }
 
@@ -63,6 +65,10 @@ func (e *Emulator) exec_inst() error {
 		e.add_rm32_r32()
 	case 0x3b:
 		e.cmp_r32_rm32()
+	case 0x3c:
+		e.cmp_al_imm8()
+	case 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47:
+		e.inc_r32()
 	case 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57:
 		e.push_r32()
 	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
@@ -70,7 +76,7 @@ func (e *Emulator) exec_inst() error {
 	case 0x6a:
 		e.push_imm8()
 	case 0x74:
-		e.jng()
+		e.jz()
 	case 0x78:
 		e.js()
 	case 0x7E:
@@ -81,8 +87,12 @@ func (e *Emulator) exec_inst() error {
 		e.code_83()
 	case 0x89:
 		e.mov_rm32_r32()
+	case 0x8A:
+		e.mov_r8_rm8()
 	case 0x8B:
 		e.mov_r32_rm32()
+	case 0xB0:
+		e.mov_r8_imm8()
 	case 0xC3:
 		e.ret()
 	case 0xC7:
@@ -175,6 +185,13 @@ func (e *Emulator) code_ff() {
 	}
 }
 
+func (e *Emulator) mov_rm8_r8() {
+	e.eip++
+	m := e.parseModRM()
+	r8 := e.get_r8(m)
+	e.set_rm8(m, r8)
+}
+
 func (e *Emulator) mov_rm32_r32() {
 	e.eip++
 	m := e.parseModRM()
@@ -197,6 +214,19 @@ func (e *Emulator) mov_r32_rm32() {
 	e.set_r32(m, rm32)
 }
 
+func (e *Emulator) mov_r8_rm8() {
+	e.eip++
+	m := e.parseModRM()
+	rm8 := e.get_rm8(m)
+	e.set_r8(m, rm8)
+}
+
+func (e *Emulator) mov_r8_imm8() {
+	reg := e.get_code8(0) - 0xB0
+	e.set_register8(reg, e.get_code8(1))
+	e.eip += 2
+}
+
 func (e *Emulator) cmp_r32_rm32() {
 	e.eip++
 	m := e.parseModRM()
@@ -204,6 +234,14 @@ func (e *Emulator) cmp_r32_rm32() {
 	rm32 := e.get_rm32(m)
 	result := uint64(r32) - uint64(rm32)
 	e.update_eflags_sub(r32, rm32, result)
+}
+
+func (e *Emulator) cmp_al_imm8() {
+	al := uint32(e.get_register8(AL))
+	value := uint32(e.get_code8(1))
+	result := uint64(al) - uint64(value)
+	e.update_eflags_sub(al, value, result)
+	e.eip += 2
 }
 
 func (e *Emulator) short_jmp() {
@@ -227,6 +265,12 @@ func (e *Emulator) jmp_rel32() {
 func (e *Emulator) push_r32() {
 	reg := e.get_code8(0) - 0x50
 	e.push32(e.get_register32(reg))
+	e.eip++
+}
+
+func (e *Emulator) inc_r32() {
+	reg := e.get_code8(0) - 0x40
+	e.set_register32(reg, e.get_register32(reg)+1)
 	e.eip++
 }
 
@@ -254,6 +298,14 @@ func (e *Emulator) call_rel32() {
 
 func (e *Emulator) ret() {
 	e.eip = e.pop32()
+}
+
+func (e *Emulator) jz() {
+	if e.get_eflag(ZERO_FLAG) {
+		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	} else {
+		e.eip += uint32(2)
+	}
 }
 
 func (e *Emulator) js() {
@@ -337,12 +389,38 @@ func (e *Emulator) get_rm32(m ModRM) uint32 {
 	}
 }
 
+func (e *Emulator) get_rm8(m ModRM) uint8 {
+	if m.mod == 3 {
+		return e.get_register8(m.rm) // TODO check OK?
+	} else {
+		address := e.calc_memory_address(m)
+		return e.get_memory8(address)
+	}
+}
+
 func (e *Emulator) get_r32(m ModRM) uint32 {
 	return e.get_register32(m.opecode)
 }
 
+func (e *Emulator) get_r8(m ModRM) uint8 {
+	return e.get_register8(m.opecode) // TOOD: Is index correct for 8bit register?
+}
+
 func (e *Emulator) set_r32(m ModRM, value uint32) {
 	e.set_register32(m.opecode, value)
+}
+
+func (e *Emulator) set_r8(m ModRM, value uint8) {
+	e.set_register8(m.opecode, value)
+}
+
+func (e *Emulator) set_rm8(m ModRM, value uint8) {
+	if m.mod == 3 {
+		e.set_register8(m.rm, value)
+	} else {
+		address := e.calc_memory_address(m)
+		e.set_memory8(address, value)
+	}
 }
 
 func (e *Emulator) calc_memory_address(m ModRM) uint32 {

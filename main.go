@@ -42,6 +42,7 @@ func main() {
 	runtime.LockOSThread()
 	filename := flag.String("f", "", "binary filename")
 	enableGUI := flag.Bool("gui", false, "gui mode")
+	silent := flag.Bool("silent", false, "silent mode")
 	flag.Parse()
 
 	// load binary
@@ -58,7 +59,7 @@ func main() {
 	fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true)
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, *silent)
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}
@@ -68,7 +69,9 @@ func main() {
 	go func(chFinished chan bool) {
 		// time.Sleep(3000 * time.Millisecond)
 		for e.eip < 0x7c00+0x10000 {
-			e.dump()
+			if !*silent {
+				e.dump()
+			}
 			err := e.exec_inst()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
