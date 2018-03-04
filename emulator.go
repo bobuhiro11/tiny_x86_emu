@@ -40,6 +40,8 @@ func (e *Emulator) exec_inst() error {
 	switch e.get_code8(0) {
 	case 0x01:
 		e.add_rm32_r32()
+	case 0x3b:
+		e.cmp_r32_rm32()
 	case 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57:
 		e.push_r32()
 	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
@@ -94,13 +96,22 @@ func (e *Emulator) code_83() {
 		rm32 := e.get_rm32(m)
 		imm8 := uint32(e.get_sign_code8(0))
 		e.eip++
-		e.set_rm32(m, rm32-imm8)
+		result := uint64(rm32) - uint64(imm8)
+		e.set_rm32(m, uint32(result))
+		e.update_eflags_sub(rm32, imm8, result)
 	}
 	add_rm32_imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.get_rm32(m)
 		imm8 := uint32(e.get_sign_code8(0))
 		e.eip++
 		e.set_rm32(m, rm32+imm8)
+	}
+	cmp_rm32_imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.get_rm32(m)
+		imm8 := uint32(e.get_sign_code8(0))
+		e.eip++
+		result := uint64(rm32) - uint64(imm8)
+		e.update_eflags_sub(rm32, imm8, result)
 	}
 	e.eip++
 	m := e.parseModRM()
@@ -109,6 +120,8 @@ func (e *Emulator) code_83() {
 		add_rm32_imm8(e, m)
 	case 5:
 		sub_rm32_imm8(e, m)
+	case 7:
+		cmp_rm32_imm8(e, m)
 	default:
 		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented")
 	}
@@ -149,6 +162,15 @@ func (e *Emulator) mov_r32_rm32() {
 	m := e.parseModRM()
 	rm32 := e.get_rm32(m)
 	e.set_r32(m, rm32)
+}
+
+func (e *Emulator) cmp_r32_rm32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.get_r32(m)
+	rm32 := e.get_rm(m)
+	result = uint64(r32) - uint64(rm32)
+	e.update_eflags_sub(r32, rm32, result)
 }
 
 func (e *Emulator) short_jmp() {
