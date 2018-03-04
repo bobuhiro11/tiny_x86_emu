@@ -14,6 +14,7 @@ guest_bin:
 	nasm -f bin ./guest/addjmp.asm  -o ./guest/addjmp.bin
 	nasm -f bin ./guest/modrm-test.asm  -o ./guest/modrm-test.bin
 	nasm -f bin ./guest/call-test.asm  -o ./guest/call-test.bin
+	nasm -f bin ./guest/test141.asm -o ./guest/test141.bin
 	# elf
 	gcc -c -g -o guest/inc.o guest/inc.c
 	gcc -nostdlib -fno-pie -fno-asynchronous-unwind-tables -g -fno-stack-protector -m32 -c guest/test.c -o guest/test.o
@@ -29,7 +30,8 @@ guest_bin:
 	# objdump -D -b binary -m i386:x86-64 ./guest/call-test.bin
 	# ndisasm -b 32 guest/call-test.bin
 	# ndisasm -b 32 guest/test132.bin
-	ndisasm -b 32 guest/test133.bin
+	# ndisasm -b 32 guest/test133.bin
+	ndisasm -b 32 guest/test141.bin
 	# hexdump -C guest/inc.bin
 	# objdump -D -b binary -m i386:x86-64 ./guest/inc.bin
 	# objdump -d -S -M intel guest/inc.o

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"github.com/fatih/color"
+	"os"
 )
 
 const (
+	// 32bit register
 	EAX = 0
 	ECX = 1
 	EDX = 2
@@ -15,6 +18,19 @@ const (
 	ESI = 6
 	EDI = 7
 
+	// TODO: 16bit register
+
+	// 8bit register
+	AL = EAX
+	CL = ECX
+	DL = EDX
+	BL = EBX
+	AH = AL + 4
+	CH = CL + 4
+	DH = DL + 4
+	BH = BL + 4
+
+	// eflags
 	CARRY_FLAG    = 1 << 0
 	ZERO_FLAG     = 1 << 6
 	SIGN_FLAG     = 1 << 7
@@ -81,6 +97,10 @@ func (e *Emulator) exec_inst() error {
 		e.call_rel32()
 	case 0xE9:
 		e.jmp_rel32()
+	case 0xEC:
+		e.in_al_dx()
+	case 0xEE:
+		e.out_al_dx()
 	case 0xFF:
 		e.code_ff()
 	default:
@@ -284,6 +304,20 @@ func (e *Emulator) jle() {
 	}
 }
 
+func (e *Emulator) in_al_dx() {
+	address := uint16(e.get_register32(EDX) & 0xffff)
+	value := e.io_in8(address)
+	e.set_register8(AL, value)
+	e.eip++
+}
+
+func (e *Emulator) out_al_dx() {
+	address := uint16(e.get_register32(EDX) & 0xffff)
+	value := e.get_register8(AL)
+	e.io_out8(address, value)
+	e.eip++
+}
+
 // util
 func (e *Emulator) set_rm32(m ModRM, value uint32) {
 	if m.mod == 3 {
@@ -345,10 +379,27 @@ func (e *Emulator) set_register32(rm uint8, value uint32) {
 }
 
 func (e *Emulator) get_register32(rm uint8) uint32 {
+	// TODO: e.esp should be moved to e.registers
 	if rm == 4 {
 		return e.esp
 	} else {
 		return e.registers[rm]
+	}
+}
+
+func (e *Emulator) get_register8(rm uint8) uint8 {
+	if rm < 4 {
+		return uint8(e.registers[rm] & 0xff)
+	} else {
+		return uint8((e.registers[rm-4] >> 8) & 0xff)
+	}
+}
+
+func (e *Emulator) set_register8(rm, value uint8) {
+	if rm < 4 {
+		e.registers[rm] = (e.registers[rm] & 0xffffff00) | uint32(value)
+	} else {
+		e.registers[rm-4] = (e.registers[rm-4] & 0xffff00ff) | (uint32(value) << 8)
 	}
 }
 
@@ -384,6 +435,26 @@ func (e *Emulator) pop32() uint32 {
 	value := e.get_memory32(e.esp)
 	e.esp += 4
 	return value
+}
+
+func (E *Emulator) io_in8(address uint16) uint8 {
+	switch address {
+	case 0x03f8:
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		return input[0]
+	default:
+		return 0
+	}
+}
+
+func (E *Emulator) io_out8(address uint16, value uint8) {
+	switch address {
+	case 0x03f8:
+		fmt.Print(string(value))
+	default:
+		return
+	}
 }
 
 func (e *Emulator) leave() {
