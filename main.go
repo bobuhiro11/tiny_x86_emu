@@ -72,7 +72,7 @@ func main() {
 			if !*silent {
 				e.dump()
 			}
-			err := e.exec_inst()
+			err := e.execInst()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
 				os.Exit(1)

@@ -91,7 +91,7 @@ func run(t *testing.T, filename string) *Emulator {
 		e.memory[i+0x7c00] = bytes[i]
 	}
 	for e.eip < 0x7c00+0x10000 {
-		err := e.exec_inst()
+		err := e.execInst()
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -103,8 +103,8 @@ func run(t *testing.T, filename string) *Emulator {
 }
 
 func assetRegister32(t *testing.T, e *Emulator, name string, index uint8, expected uint32) {
-	if e.get_register32(index) != expected {
+	if e.getRegister32(index) != expected {
 		t.Fatalf("Bad %s, expected=%08x, actual=%08x\n",
-			name, expected, e.get_register32(index))
+			name, expected, e.getRegister32(index))
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"os"
 )
 
+// 32bit registers
 const (
-	// 32bit register
 	EAX = 0
 	ECX = 1
 	EDX = 2
@@ -17,10 +17,10 @@ const (
 	EBP = 5
 	ESI = 6
 	EDI = 7
+)
 
-	// TODO: 16bit register
-
-	// 8bit register
+// 8bit register
+const (
 	AL = EAX
 	CL = ECX
 	DL = EDX
@@ -29,14 +29,17 @@ const (
 	CH = CL + 4
 	DH = DL + 4
 	BH = BL + 4
-
-	// eflags
-	CARRY_FLAG    = 1 << 0
-	ZERO_FLAG     = 1 << 6
-	SIGN_FLAG     = 1 << 7
-	OVERFLOW_FLAG = 1 << 11
 )
 
+// eflags
+const (
+	CARRY    = 1 << 0
+	ZERO     = 1 << 6
+	SIGN     = 1 << 7
+	OVERFLOW = 1 << 11
+)
+
+// Emulator is an i386 Virtual Machine
 type Emulator struct {
 	registers   [8]uint32 // general registers
 	eflags      uint32    // eflags
@@ -47,9 +50,10 @@ type Emulator struct {
 	isSilent    bool      // silent mode
 }
 
-func NewEmulator(memory_size, eip, esp uint32, is32bitmode, isSilent bool) *Emulator {
+// NewEmulator creates New Emulator
+func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool) *Emulator {
 	return &Emulator{
-		memory:      make([]uint8, memory_size),
+		memory:      make([]uint8, memorySize),
 		eip:         eip,
 		esp:         esp,
 		is32bitmode: is32bitmode,
@@ -59,24 +63,24 @@ func NewEmulator(memory_size, eip, esp uint32, is32bitmode, isSilent bool) *Emul
 
 // emulate instruction
 
-func (e *Emulator) exec_inst() error {
-	switch e.get_code8(0) {
+func (e *Emulator) execInst() error {
+	switch e.getCode8(0) {
 	case 0x01:
-		e.add_rm32_r32()
+		e.addRm32R32()
 	case 0x3b:
-		e.cmp_r32_rm32()
+		e.cmpR32Rm32()
 	case 0x3c:
-		e.cmp_al_imm8()
+		e.cmpAlImm8()
 	case 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47:
-		e.inc_r32()
+		e.incR32()
 	case 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f:
-		e.dec_r32()
+		e.decR32()
 	case 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57:
-		e.push_r32()
+		e.pushR32()
 	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
-		e.pop_r32()
+		e.popR32()
 	case 0x6a:
-		e.push_imm8()
+		e.pushImm8()
 	case 0x74:
 		e.jz()
 	case 0x78:
@@ -86,39 +90,39 @@ func (e *Emulator) exec_inst() error {
 	case 0x7F:
 		e.jg()
 	case 0x83:
-		e.code_83()
+		e.code83()
 	case 0x89:
-		e.mov_rm32_r32()
+		e.movRm32R32()
 	case 0x8A:
-		e.mov_r8_rm8()
+		e.movR8Rm8()
 	case 0x8B:
-		e.mov_r32_rm32()
+		e.movR32Rm32()
 	case 0xB0:
-		e.mov_r8_imm8()
+		e.movR8Imm8()
 	case 0x90:
 		e.nop()
 	case 0xC3:
 		e.ret()
 	case 0xC7:
-		e.mov_rm32_imm32()
+		e.movRm32Imm32()
 	case 0xC9:
 		e.leave()
 	case 0xEB:
-		e.short_jmp()
+		e.shortJmp()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
-		e.mov_r32_imm32()
+		e.movR32Imm32()
 	case 0xE8:
-		e.call_rel32()
+		e.callRel32()
 	case 0xE9:
-		e.jmp_rel32()
+		e.jmpRel32()
 	case 0xEC:
-		e.in_al_dx()
+		e.inAlDx()
 	case 0xEE:
-		e.out_al_dx()
+		e.outAlDx()
 	case 0xFF:
-		e.code_ff()
+		e.codeFf()
 	default:
-		return errors.New(fmt.Sprintf("opecode = %x", e.get_code8(0)) + " is not implemented.")
+		return errors.New(fmt.Sprintf("opecode = %x", e.getCode8(0)) + " is not implemented.")
 	}
 	return nil
 }
@@ -127,133 +131,133 @@ func (e *Emulator) nop() {
 	e.eip++
 }
 
-func (e *Emulator) mov_r32_imm32() {
-	reg := e.get_code8(0) - 0xB8
-	value := e.get_code32(1)
+func (e *Emulator) movR32Imm32() {
+	reg := e.getCode8(0) - 0xB8
+	value := e.getCode32(1)
 	e.registers[reg] = value
 	e.eip += 5
 }
 
-func (e *Emulator) mov_rm32_imm32() {
+func (e *Emulator) movRm32Imm32() {
 	e.eip++
 	m := e.parseModRM()
-	value := e.get_code32(0)
+	value := e.getCode32(0)
 	e.eip += 4
-	e.set_rm32(m, value)
+	e.setRm32(m, value)
 }
 
-func (e *Emulator) code_83() {
-	sub_rm32_imm8 := func(e *Emulator, m ModRM) {
-		rm32 := e.get_rm32(m)
-		imm8 := uint32(e.get_sign_code8(0))
+func (e *Emulator) code83() {
+	subRm32Imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
 		result := uint64(rm32) - uint64(imm8)
-		e.set_rm32(m, uint32(result))
-		e.update_eflags_sub(rm32, imm8, result)
+		e.setRm32(m, uint32(result))
+		e.updateEflagsSub(rm32, imm8, result)
 	}
-	add_rm32_imm8 := func(e *Emulator, m ModRM) {
-		rm32 := e.get_rm32(m)
-		imm8 := uint32(e.get_sign_code8(0))
+	addRm32Imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
-		e.set_rm32(m, rm32+imm8)
+		e.setRm32(m, rm32+imm8)
 	}
-	cmp_rm32_imm8 := func(e *Emulator, m ModRM) {
-		rm32 := e.get_rm32(m)
-		imm8 := uint32(e.get_sign_code8(0))
+	cmpRm32Imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
 		result := uint64(rm32) - uint64(imm8)
-		e.update_eflags_sub(rm32, imm8, result)
+		e.updateEflagsSub(rm32, imm8, result)
 	}
 	e.eip++
 	m := e.parseModRM()
 	switch m.opecode {
 	case 0:
-		add_rm32_imm8(e, m)
+		addRm32Imm8(e, m)
 	case 5:
-		sub_rm32_imm8(e, m)
+		subRm32Imm8(e, m)
 	case 7:
-		cmp_rm32_imm8(e, m)
+		cmpRm32Imm8(e, m)
 	default:
 		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented")
 	}
 }
 
-func (e *Emulator) code_ff() {
-	inc_rm32 := func(e *Emulator, m ModRM) {
-		rm32 := e.get_rm32(m)
-		e.set_rm32(m, rm32+1)
+func (e *Emulator) codeFf() {
+	incRm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		e.setRm32(m, rm32+1)
 	}
 	e.eip++
 	m := e.parseModRM()
 	switch m.opecode {
 	case 0:
-		inc_rm32(e, m)
+		incRm32(e, m)
 	default:
 		panic("not implemented")
 	}
 }
 
-func (e *Emulator) mov_rm8_r8() {
+func (e *Emulator) movRm8R8() {
 	e.eip++
 	m := e.parseModRM()
-	r8 := e.get_r8(m)
-	e.set_rm8(m, r8)
+	r8 := e.getR8(m)
+	e.setRm8(m, r8)
 }
 
-func (e *Emulator) mov_rm32_r32() {
+func (e *Emulator) movRm32R32() {
 	e.eip++
 	m := e.parseModRM()
-	r32 := e.get_r32(m)
-	e.set_rm32(m, r32)
+	r32 := e.getR32(m)
+	e.setRm32(m, r32)
 }
 
-func (e *Emulator) add_rm32_r32() {
+func (e *Emulator) addRm32R32() {
 	e.eip++
 	m := e.parseModRM()
-	r32 := e.get_r32(m)
-	rm32 := e.get_rm32(m)
-	e.set_rm32(m, r32+rm32)
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	e.setRm32(m, r32+rm32)
 }
 
-func (e *Emulator) mov_r32_rm32() {
+func (e *Emulator) movR32Rm32() {
 	e.eip++
 	m := e.parseModRM()
-	rm32 := e.get_rm32(m)
-	e.set_r32(m, rm32)
+	rm32 := e.getRm32(m)
+	e.setR32(m, rm32)
 }
 
-func (e *Emulator) mov_r8_rm8() {
+func (e *Emulator) movR8Rm8() {
 	e.eip++
 	m := e.parseModRM()
-	rm8 := e.get_rm8(m)
-	e.set_r8(m, rm8)
+	rm8 := e.getRm8(m)
+	e.setR8(m, rm8)
 }
 
-func (e *Emulator) mov_r8_imm8() {
-	reg := e.get_code8(0) - 0xB0
-	e.set_register8(reg, e.get_code8(1))
+func (e *Emulator) movR8Imm8() {
+	reg := e.getCode8(0) - 0xB0
+	e.setRegister8(reg, e.getCode8(1))
 	e.eip += 2
 }
 
-func (e *Emulator) cmp_r32_rm32() {
+func (e *Emulator) cmpR32Rm32() {
 	e.eip++
 	m := e.parseModRM()
-	r32 := e.get_r32(m)
-	rm32 := e.get_rm32(m)
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
 	result := uint64(r32) - uint64(rm32)
-	e.update_eflags_sub(r32, rm32, result)
+	e.updateEflagsSub(r32, rm32, result)
 }
 
-func (e *Emulator) cmp_al_imm8() {
-	al := uint32(e.get_register8(AL))
-	value := uint32(e.get_code8(1))
+func (e *Emulator) cmpAlImm8() {
+	al := uint32(e.getRegister8(AL))
+	value := uint32(e.getCode8(1))
 	result := uint64(al) - uint64(value)
-	e.update_eflags_sub(al, value, result)
+	e.updateEflagsSub(al, value, result)
 	e.eip += 2
 }
 
-func (e *Emulator) short_jmp() {
-	diff := int32(e.get_sign_code8(1))
+func (e *Emulator) shortJmp() {
+	diff := int32(e.getSignCode8(1))
 	if diff < 0 {
 		e.eip = e.eip - uint32(-diff) + uint32(2)
 	} else {
@@ -261,8 +265,8 @@ func (e *Emulator) short_jmp() {
 	}
 }
 
-func (e *Emulator) jmp_rel32() {
-	diff := e.get_sign_code32(1)
+func (e *Emulator) jmpRel32() {
+	diff := e.getSignCode32(1)
 	if diff < 0 {
 		e.eip = e.eip - uint32(-diff) + uint32(5)
 	} else {
@@ -270,38 +274,38 @@ func (e *Emulator) jmp_rel32() {
 	}
 }
 
-func (e *Emulator) push_r32() {
-	reg := e.get_code8(0) - 0x50
-	e.push32(e.get_register32(reg))
+func (e *Emulator) pushR32() {
+	reg := e.getCode8(0) - 0x50
+	e.push32(e.getRegister32(reg))
 	e.eip++
 }
 
-func (e *Emulator) inc_r32() {
-	reg := e.get_code8(0) - 0x40
-	e.set_register32(reg, e.get_register32(reg)+1)
+func (e *Emulator) incR32() {
+	reg := e.getCode8(0) - 0x40
+	e.setRegister32(reg, e.getRegister32(reg)+1)
 	e.eip++
 }
 
-func (e *Emulator) dec_r32() {
-	reg := e.get_code8(0) - 0x48
-	e.set_register32(reg, e.get_register32(reg)-1)
+func (e *Emulator) decR32() {
+	reg := e.getCode8(0) - 0x48
+	e.setRegister32(reg, e.getRegister32(reg)-1)
 	e.eip++
 }
 
-func (e *Emulator) pop_r32() {
-	reg := e.get_code8(0) - 0x58
-	e.set_register32(reg, e.pop32())
+func (e *Emulator) popR32() {
+	reg := e.getCode8(0) - 0x58
+	e.setRegister32(reg, e.pop32())
 	e.eip++
 }
 
-func (e *Emulator) push_imm8() {
-	value := uint32(e.get_code8(1))
+func (e *Emulator) pushImm8() {
+	value := uint32(e.getCode8(1))
 	e.push32(value)
 	e.eip += 2
 }
 
-func (e *Emulator) call_rel32() {
-	diff := e.get_singed_code32(1)
+func (e *Emulator) callRel32() {
+	diff := e.getSingedCode32(1)
 	e.push32(e.eip + 5)
 	if diff < 0 {
 		e.eip = e.eip - uint32(-diff) + uint32(5)
@@ -315,154 +319,149 @@ func (e *Emulator) ret() {
 }
 
 func (e *Emulator) jz() {
-	if e.get_eflag(ZERO_FLAG) {
-		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	if e.getEflag(ZERO) {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
 	}
 }
 
 func (e *Emulator) js() {
-	if e.get_eflag(SIGN_FLAG) {
-		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	if e.getEflag(SIGN) {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
 	}
 }
 
 func (e *Emulator) jns() {
-	if e.get_eflag(SIGN_FLAG) {
+	if e.getEflag(SIGN) {
 		e.eip += uint32(2)
 	} else {
-		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	}
 }
 
 func (e *Emulator) jg() {
-	if e.get_eflag(ZERO_FLAG) && e.get_eflag(SIGN_FLAG) == e.get_eflag(OVERFLOW_FLAG) {
-		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	if e.getEflag(ZERO) && e.getEflag(SIGN) == e.getEflag(OVERFLOW) {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
 	}
 }
 
 func (e *Emulator) jng() {
-	if e.get_eflag(ZERO_FLAG) || e.get_eflag(SIGN_FLAG) != e.get_eflag(OVERFLOW_FLAG) {
-		e.eip += uint32(2) + uint32(e.get_sign_code8(1))
+	if e.getEflag(ZERO) || e.getEflag(SIGN) != e.getEflag(OVERFLOW) {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
 	}
 }
 
 func (e *Emulator) jl() {
-	if e.get_eflag(SIGN_FLAG) != e.get_eflag(OVERFLOW_FLAG) {
-		e.eip += uint32(e.get_sign_code8(1))
+	if e.getEflag(SIGN) != e.getEflag(OVERFLOW) {
+		e.eip += uint32(e.getSignCode8(1))
 	} else {
 		e.eip += 2
 	}
 }
 
 func (e *Emulator) jle() {
-	if e.get_eflag(ZERO_FLAG) || e.get_eflag(SIGN_FLAG) != e.get_eflag(OVERFLOW_FLAG) {
-		e.eip += uint32(e.get_sign_code8(1))
+	if e.getEflag(ZERO) || e.getEflag(SIGN) != e.getEflag(OVERFLOW) {
+		e.eip += uint32(e.getSignCode8(1))
 	} else {
 		e.eip += 2
 	}
 }
 
-func (e *Emulator) in_al_dx() {
-	address := uint16(e.get_register32(EDX) & 0xffff)
-	value := e.io_in8(address)
-	e.set_register8(AL, value)
+func (e *Emulator) inAlDx() {
+	address := uint16(e.getRegister32(EDX) & 0xffff)
+	value := e.ioIn8(address)
+	e.setRegister8(AL, value)
 	e.eip++
 }
 
-func (e *Emulator) out_al_dx() {
-	address := uint16(e.get_register32(EDX) & 0xffff)
-	value := e.get_register8(AL)
-	e.io_out8(address, value)
+func (e *Emulator) outAlDx() {
+	address := uint16(e.getRegister32(EDX) & 0xffff)
+	value := e.getRegister8(AL)
+	e.ioOut8(address, value)
 	e.eip++
 }
 
 // util
-func (e *Emulator) set_rm32(m ModRM, value uint32) {
+func (e *Emulator) setRm32(m ModRM, value uint32) {
 	if m.mod == 3 {
-		e.set_register32(m.rm, value)
+		e.setRegister32(m.rm, value)
 	} else {
-		address := e.calc_memory_address(m)
-		e.set_memory32(address, value)
+		address := e.calcMemoryAddress(m)
+		e.setMemory32(address, value)
 	}
 }
 
-func (e *Emulator) get_rm32(m ModRM) uint32 {
+func (e *Emulator) getRm32(m ModRM) uint32 {
 	if m.mod == 3 {
-		return e.get_register32(m.rm)
+		return e.getRegister32(m.rm)
+	}
+	address := e.calcMemoryAddress(m)
+	return e.getMemory32(address)
+}
+
+func (e *Emulator) getRm8(m ModRM) uint8 {
+	if m.mod == 3 {
+		return e.getRegister8(m.rm) // TODO check OK?
+	}
+	address := e.calcMemoryAddress(m)
+	return e.getMemory8(address)
+}
+
+func (e *Emulator) getR32(m ModRM) uint32 {
+	return e.getRegister32(m.opecode)
+}
+
+func (e *Emulator) getR8(m ModRM) uint8 {
+	return e.getRegister8(m.opecode) // TOOD: Is index correct for 8bit register?
+}
+
+func (e *Emulator) setR32(m ModRM, value uint32) {
+	e.setRegister32(m.opecode, value)
+}
+
+func (e *Emulator) setR8(m ModRM, value uint8) {
+	e.setRegister8(m.opecode, value)
+}
+
+func (e *Emulator) setRm8(m ModRM, value uint8) {
+	if m.mod == 3 {
+		e.setRegister8(m.rm, value)
 	} else {
-		address := e.calc_memory_address(m)
-		return e.get_memory32(address)
+		address := e.calcMemoryAddress(m)
+		e.setMemory8(address, value)
 	}
 }
 
-func (e *Emulator) get_rm8(m ModRM) uint8 {
-	if m.mod == 3 {
-		return e.get_register8(m.rm) // TODO check OK?
-	} else {
-		address := e.calc_memory_address(m)
-		return e.get_memory8(address)
-	}
-}
-
-func (e *Emulator) get_r32(m ModRM) uint32 {
-	return e.get_register32(m.opecode)
-}
-
-func (e *Emulator) get_r8(m ModRM) uint8 {
-	return e.get_register8(m.opecode) // TOOD: Is index correct for 8bit register?
-}
-
-func (e *Emulator) set_r32(m ModRM, value uint32) {
-	e.set_register32(m.opecode, value)
-}
-
-func (e *Emulator) set_r8(m ModRM, value uint8) {
-	e.set_register8(m.opecode, value)
-}
-
-func (e *Emulator) set_rm8(m ModRM, value uint8) {
-	if m.mod == 3 {
-		e.set_register8(m.rm, value)
-	} else {
-		address := e.calc_memory_address(m)
-		e.set_memory8(address, value)
-	}
-}
-
-func (e *Emulator) calc_memory_address(m ModRM) uint32 {
+func (e *Emulator) calcMemoryAddress(m ModRM) uint32 {
 	if m.mod == 0 {
 		// [register + resiger]
 		if m.rm == 5 {
 			return m.disp32 // Is this a EBP?
-		} else {
-			return e.get_register32(m.rm)
 		}
+		return e.getRegister32(m.rm)
 	} else if m.mod == 1 {
 		// [register + disp8]
 		disp8 := m.getDisp8()
 		if disp8 < 0 {
-			return e.get_register32(m.rm) - uint32(-disp8)
-		} else {
-			return e.get_register32(m.rm) + uint32(disp8)
+			return e.getRegister32(m.rm) - uint32(-disp8)
 		}
+		return e.getRegister32(m.rm) + uint32(disp8)
 	} else if m.mod == 2 {
 		// [redister + disp16/32]
-		return e.get_register32(m.rm) + m.disp32
-	} else {
-		// register
-		panic("ModRM mod = 4 is not implemented")
+		return e.getRegister32(m.rm) + m.disp32
 	}
+	// register
+	panic("ModRM mod = 4 is not implemented")
 }
 
-func (e *Emulator) set_register32(rm uint8, value uint32) {
+func (e *Emulator) setRegister32(rm uint8, value uint32) {
 	if rm == 4 {
 		e.esp = value
 	} else {
@@ -470,24 +469,22 @@ func (e *Emulator) set_register32(rm uint8, value uint32) {
 	}
 }
 
-func (e *Emulator) get_register32(rm uint8) uint32 {
+func (e *Emulator) getRegister32(rm uint8) uint32 {
 	// TODO: e.esp should be moved to e.registers
 	if rm == 4 {
 		return e.esp
-	} else {
-		return e.registers[rm]
 	}
+	return e.registers[rm]
 }
 
-func (e *Emulator) get_register8(rm uint8) uint8 {
+func (e *Emulator) getRegister8(rm uint8) uint8 {
 	if rm < 4 {
 		return uint8(e.registers[rm] & 0xff)
-	} else {
-		return uint8((e.registers[rm-4] >> 8) & 0xff)
 	}
+	return uint8((e.registers[rm-4] >> 8) & 0xff)
 }
 
-func (e *Emulator) set_register8(rm, value uint8) {
+func (e *Emulator) setRegister8(rm, value uint8) {
 	if rm < 4 {
 		e.registers[rm] = (e.registers[rm] & 0xffffff00) | uint32(value)
 	} else {
@@ -495,41 +492,41 @@ func (e *Emulator) set_register8(rm, value uint8) {
 	}
 }
 
-func (e *Emulator) set_memory8(address uint32, value uint8) {
+func (e *Emulator) setMemory8(address uint32, value uint8) {
 	e.memory[address] = value
 }
 
-func (e *Emulator) set_memory32(address, value uint32) {
+func (e *Emulator) setMemory32(address, value uint32) {
 	for i := uint32(0); i < 4; i++ {
-		e.set_memory8(address+i, uint8(value>>uint32(i*8)&0xFF))
+		e.setMemory8(address+i, uint8(value>>uint32(i*8)&0xFF))
 	}
 }
 
-func (e *Emulator) get_memory8(address uint32) uint8 {
+func (e *Emulator) getMemory8(address uint32) uint8 {
 	return e.memory[address]
 }
 
-func (e *Emulator) get_memory32(address uint32) uint32 {
+func (e *Emulator) getMemory32(address uint32) uint32 {
 	var ret uint32
 	for i := uint32(0); i < 4; i++ {
-		ret |= uint32(e.get_memory8(address+i)) << uint32(i*8)
+		ret |= uint32(e.getMemory8(address+i)) << uint32(i*8)
 	}
 	return ret
 }
 
 func (e *Emulator) push32(value uint32) {
 	address := e.esp - 4
-	e.set_memory32(address, value)
+	e.setMemory32(address, value)
 	e.esp = address
 }
 
 func (e *Emulator) pop32() uint32 {
-	value := e.get_memory32(e.esp)
+	value := e.getMemory32(e.esp)
 	e.esp += 4
 	return value
 }
 
-func (E *Emulator) io_in8(address uint16) uint8 {
+func (e *Emulator) ioIn8(address uint16) uint8 {
 	switch address {
 	case 0x03f8:
 		reader := bufio.NewReader(os.Stdin)
@@ -540,7 +537,7 @@ func (E *Emulator) io_in8(address uint16) uint8 {
 	}
 }
 
-func (E *Emulator) io_out8(address uint16, value uint8) {
+func (e *Emulator) ioOut8(address uint16, value uint8) {
 	switch address {
 	case 0x03f8:
 		fmt.Print(string(value))
@@ -550,9 +547,9 @@ func (E *Emulator) io_out8(address uint16, value uint8) {
 }
 
 func (e *Emulator) leave() {
-	ebp := e.get_register32(EBP)
+	ebp := e.getRegister32(EBP)
 	e.esp = ebp
-	e.set_register32(EBP, e.pop32())
+	e.setRegister32(EBP, e.pop32())
 	e.eip++
 }
 
@@ -581,12 +578,12 @@ func (e *Emulator) dump() {
 		e.eip,
 	)
 	color.New(color.FgGreen).Printf("(opecode=%x)\n",
-		e.get_code8(0))
+		e.getCode8(0))
 }
 
 // get text segment
 
-func (e *Emulator) get_code8(index int32) uint8 {
+func (e *Emulator) getCode8(index int32) uint8 {
 	var addr uint32
 	if index < 0 {
 		addr = e.eip - uint32(-index)
@@ -596,38 +593,38 @@ func (e *Emulator) get_code8(index int32) uint8 {
 	return e.memory[addr]
 }
 
-func (e *Emulator) get_sign_code8(index int32) int8 {
-	return int8(e.get_code8(index))
+func (e *Emulator) getSignCode8(index int32) int8 {
+	return int8(e.getCode8(index))
 }
 
-func (e *Emulator) get_sign_code32(index int32) int32 {
-	return int32(e.get_code32(index))
+func (e *Emulator) getSignCode32(index int32) int32 {
+	return int32(e.getCode32(index))
 }
 
-func (e *Emulator) get_code32(index int32) uint32 {
+func (e *Emulator) getCode32(index int32) uint32 {
 	var ret uint32
 	for i := int32(0); i < 4; i++ {
-		ret |= uint32(e.get_code8(index+i)) << uint32(i*8)
+		ret |= uint32(e.getCode8(index+i)) << uint32(i*8)
 	}
 	return ret
 }
 
-func (e *Emulator) get_singed_code32(index int32) int32 {
-	return int32(e.get_code32(index))
+func (e *Emulator) getSingedCode32(index int32) int32 {
+	return int32(e.getCode32(index))
 }
 
-func (e *Emulator) update_eflags_sub(v1, v2 uint32, result uint64) {
+func (e *Emulator) updateEflagsSub(v1, v2 uint32, result uint64) {
 	sign1 := (v1 >> 31) & 0x01
 	sign2 := (v2 >> 31) & 0x01
 	signr := uint32((result >> 31) & 0x01)
 
-	e.set_eflag(CARRY_FLAG, result>>32 != 0)
-	e.set_eflag(ZERO_FLAG, result == 0)
-	e.set_eflag(SIGN_FLAG, signr != 0)
-	e.set_eflag(OVERFLOW_FLAG, sign1 != sign2 && sign1 != signr)
+	e.setEflag(CARRY, result>>32 != 0)
+	e.setEflag(ZERO, result == 0)
+	e.setEflag(SIGN, signr != 0)
+	e.setEflag(OVERFLOW, sign1 != sign2 && sign1 != signr)
 }
 
-func (e *Emulator) set_eflag(flag uint32, cond bool) {
+func (e *Emulator) setEflag(flag uint32, cond bool) {
 	if cond {
 		e.eflags |= flag
 	} else {
@@ -635,15 +632,14 @@ func (e *Emulator) set_eflag(flag uint32, cond bool) {
 	}
 }
 
-func (e *Emulator) get_eflag(flag uint32) bool {
+func (e *Emulator) getEflag(flag uint32) bool {
 	return e.eflags&flag != 0
 }
 
-// modrm
-
+// ModRM parameter
 type ModRM struct {
 	mod     uint8
-	opecode uint8 // This can be regarded as reg_index.
+	opecode uint8 // This can be regarded as regIndex.
 	rm      uint8
 	sib     uint8
 	disp32  uint32 // This can be regarded as (disp8, signed int8).
@@ -659,10 +655,10 @@ func (m *ModRM) setDisp8(disp8 int8) {
 
 // load ModR/M & increment eip
 func (e *Emulator) parseModRM() ModRM {
-	code := e.get_code8(0)
+	code := e.getCode8(0)
 
 	// 76  543                210
-	// mod reg_index(opecode) r/m
+	// mod regIndex(opecode) r/m
 	m := ModRM{
 		mod:     (code >> 6) & 0x03,
 		opecode: (code >> 3) & 0x07,
@@ -672,15 +668,15 @@ func (e *Emulator) parseModRM() ModRM {
 	e.eip++
 
 	if m.mod != 3 && m.rm == 4 {
-		m.sib = e.get_code8(0)
+		m.sib = e.getCode8(0)
 		e.eip++
 	}
 
 	if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
-		m.disp32 = e.get_code32(0) // Is this a bug on the book?
+		m.disp32 = e.getCode32(0) // Is this a bug on the book?
 		e.eip += 4
 	} else if m.mod == 1 {
-		m.setDisp8(e.get_sign_code8(0))
+		m.setDisp8(e.getSignCode8(0))
 		e.eip++
 	}
 
