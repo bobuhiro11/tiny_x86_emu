@@ -69,6 +69,8 @@ func (e *Emulator) exec_inst() error {
 		e.cmp_al_imm8()
 	case 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47:
 		e.inc_r32()
+	case 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f:
+		e.dec_r32()
 	case 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57:
 		e.push_r32()
 	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
@@ -93,6 +95,8 @@ func (e *Emulator) exec_inst() error {
 		e.mov_r32_rm32()
 	case 0xB0:
 		e.mov_r8_imm8()
+	case 0x90:
+		e.nop()
 	case 0xC3:
 		e.ret()
 	case 0xC7:
@@ -117,6 +121,10 @@ func (e *Emulator) exec_inst() error {
 		return errors.New(fmt.Sprintf("opecode = %x", e.get_code8(0)) + " is not implemented.")
 	}
 	return nil
+}
+
+func (e *Emulator) nop() {
+	e.eip++
 }
 
 func (e *Emulator) mov_r32_imm32() {
@@ -271,6 +279,12 @@ func (e *Emulator) push_r32() {
 func (e *Emulator) inc_r32() {
 	reg := e.get_code8(0) - 0x40
 	e.set_register32(reg, e.get_register32(reg)+1)
+	e.eip++
+}
+
+func (e *Emulator) dec_r32() {
+	reg := e.get_code8(0) - 0x48
+	e.set_register32(reg, e.get_register32(reg)-1)
 	e.eip++
 }
 
