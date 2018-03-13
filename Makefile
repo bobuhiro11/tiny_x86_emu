@@ -13,7 +13,7 @@ guest_bin:
 	gcc -Wl,--entry=inc,--oformat=binary -nostdlib -fno-asynchronous-unwind-tables \
 		-o guest/inc.bin guest/inc.c
 	# binary from nasm
-	for name in addjmp modrm-test call-test test141 test143 ; do \
+	for name in addjmp modrm-test call-test test141 test143 mbr; do \
 		nasm -f bin ./guest/$${name}.asm -o ./guest/$${name}.bin ; \
 	done
 	# elf from gcc
