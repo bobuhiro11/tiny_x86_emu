@@ -24,6 +24,7 @@ do
              -e "fs\s*0x" \
              -e "gs\s*0x" \
              -e "===" \
+     | awk '{print $1,$2;}'
      > ${reg_file}
   gdb_pid=$!;
   sleep 1
