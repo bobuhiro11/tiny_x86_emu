@@ -23,6 +23,7 @@ do
              -e "es\s*0x" \
              -e "fs\s*0x" \
              -e "gs\s*0x" \
+             -e "===" \
      > ${reg_file}
   gdb_pid=$!;
   sleep 1

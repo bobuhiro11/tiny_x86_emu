@@ -4,8 +4,10 @@ break *0x7c00
 c
 info registers
 si
+echo ===\n
 info registers
 si
+echo ===\n
 info registers
 quit
 y
