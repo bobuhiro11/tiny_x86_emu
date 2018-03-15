@@ -11,6 +11,10 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	// "path/filepath"
 	"runtime"
 	// "time"
 )
@@ -40,7 +44,7 @@ func update(screen *ebiten.Image) error {
 
 func main() {
 	runtime.LockOSThread()
-	filename := flag.String("f", "", "binary filename")
+	filename := flag.String("f", "", "binary filename (*.bin)")
 	enableGUI := flag.Bool("gui", false, "gui mode")
 	silent := flag.Bool("silent", false, "silent mode")
 	flag.Parse()
@@ -50,6 +54,21 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Please set filename")
 		os.Exit(1)
 	}
+	// disasm binary
+	b, err := exec.Command("ndisasm", "-b", "16", *filename, "-o", "0x7c00").CombinedOutput()
+	disasm := map[uint64]string{}
+	if err != nil {
+		panic(err)
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		row := strings.Fields(line)
+		if len(row) < 3 {
+			continue
+		}
+		ix, _ := strconv.ParseUint(row[0][2:], 16, 64)
+		disasm[ix] = strings.Join(row[1:], " ")
+	}
+
 	bytes, err := loadFile(*filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -59,7 +78,7 @@ func main() {
 	fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, *silent)
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, *silent, disasm)
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}

@@ -86,7 +86,7 @@ func run(t *testing.T, filename string) *Emulator {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, true)
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, true, map[uint64]string{})
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}

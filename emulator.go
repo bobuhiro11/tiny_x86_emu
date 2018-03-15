@@ -19,6 +19,14 @@ const (
 	EDI = 7
 )
 
+// 16bit register
+const (
+	AX = EAX
+	CX = ECX
+	DX = EDX
+	BX = EBX
+)
+
 // 8bit register
 const (
 	AL = EAX
@@ -41,23 +49,25 @@ const (
 
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
-	registers   [8]uint32 // general registers
-	eflags      uint32    // eflags
-	memory      []uint8   // physical memory
-	eip         uint32    // program counter
-	esp         uint32    // stack pointer (#reg = 4)
-	is32bitmode bool      // if this value is false, the enulator work as 16 bit mode
-	isSilent    bool      // silent mode
+	registers   [8]uint32         // general registers
+	eflags      uint32            // eflags
+	memory      []uint8           // physical memory
+	eip         uint32            // program counter
+	esp         uint32            // stack pointer (#reg = 4)
+	is32bitmode bool              // if this value is false, the enulator work as 16 bit mode
+	isSilent    bool              // silent mode
+	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
 // NewEmulator creates New Emulator
-func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool) *Emulator {
+func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, disasm map[uint64]string) *Emulator {
 	return &Emulator{
 		memory:      make([]uint8, memorySize),
 		eip:         eip,
 		esp:         esp,
 		is32bitmode: is32bitmode,
 		isSilent:    isSilent,
+		disasm:      disasm,
 	}
 }
 
@@ -577,8 +587,8 @@ func (e *Emulator) dump() {
 		e.esp,
 		e.eip,
 	)
-	color.New(color.FgGreen).Printf("(opecode=%x)\n",
-		e.getCode8(0))
+	color.New(color.FgGreen).Printf("(opecode=%x, %s)\n",
+		e.getCode8(0), e.disasm[uint64(e.eip)])
 }
 
 // get text segment
