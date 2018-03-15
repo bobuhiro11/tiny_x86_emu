@@ -14,6 +14,7 @@ const (
 	ECX = 1
 	EDX = 2
 	EBX = 3
+	ESP = 4
 	EBP = 5
 	ESI = 6
 	EDI = 7
@@ -25,7 +26,7 @@ const (
 	CX = ECX
 	DX = EDX
 	BX = EBX
-	IP = 4
+	SP = ESP
 	BP = EBP
 	SI = ESI
 	DI = EDI
@@ -53,13 +54,13 @@ const (
 
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
-	registers   [8]uint32         // general registers
-	cr          [16]uint32        // controll registers
-	sreg        [4]uint32         // segment registers
-	eflags      uint32            // eflags
-	memory      []uint8           // physical memory
-	eip         uint32            // program counter
-	esp         uint32            // stack pointer (#reg = 4)
+	registers [8]uint32  // general registers
+	cr        [16]uint32 // controll registers
+	sreg      [4]uint32  // segment registers
+	eflags    uint32     // eflags
+	memory    []uint8    // physical memory
+	eip       uint32     // program counter
+	// esp         uint32            // stack pointer (#reg = 4)
 	is32bitmode bool              // if this value is false, the enulator work as 16 bit mode
 	isSilent    bool              // silent mode
 	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
@@ -67,14 +68,15 @@ type Emulator struct {
 
 // NewEmulator creates New Emulator
 func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, disasm map[uint64]string) *Emulator {
-	return &Emulator{
+	e := &Emulator{
 		memory:      make([]uint8, memorySize),
 		eip:         eip,
-		esp:         esp,
 		is32bitmode: is32bitmode,
 		isSilent:    isSilent,
 		disasm:      disasm,
 	}
+	e.registers[ESP] = esp
+	return e
 }
 
 // emulate instruction
@@ -511,33 +513,18 @@ func (e *Emulator) calcMemoryAddress(m ModRM) uint32 {
 }
 
 func (e *Emulator) setRegister32(rm uint8, value uint32) {
-	if rm == 4 {
-		e.esp = value
-	} else {
-		e.registers[rm] = value
-	}
+	e.registers[rm] = value
 }
 
 func (e *Emulator) setRegister16(rm uint8, value uint16) {
-	if rm == 4 {
-		e.esp = (e.esp & 0xFFFF0000) | uint32(value)
-	} else {
-		e.registers[rm] = (e.registers[rm] & 0xFFFF0000) | uint32(value)
-	}
+	e.registers[rm] = (e.registers[rm] & 0xFFFF0000) | uint32(value)
 }
 
 func (e *Emulator) getRegister32(rm uint8) uint32 {
-	// TODO: e.esp should be moved to e.registers
-	if rm == 4 {
-		return e.esp
-	}
 	return e.registers[rm]
 }
 
 func (e *Emulator) getRegister16(rm uint8) uint16 {
-	if rm == 4 {
-		return uint16(e.esp)
-	}
 	return uint16(e.registers[rm] & 0xffff)
 }
 
@@ -554,6 +541,14 @@ func (e *Emulator) setRegister8(rm, value uint8) {
 	} else {
 		e.registers[rm-4] = (e.registers[rm-4] & 0xffff00ff) | (uint32(value) << 8)
 	}
+}
+
+func (e *Emulator) incRegister32(rm uint8, value uint32) {
+	e.registers[rm] += value
+}
+
+func (e *Emulator) decRegister32(rm uint8, value uint32) {
+	e.registers[rm] -= value
 }
 
 func (e *Emulator) setMemory8(address uint32, value uint8) {
@@ -587,14 +582,14 @@ func (e *Emulator) getMemory32(address uint32) uint32 {
 }
 
 func (e *Emulator) push32(value uint32) {
-	address := e.esp - 4
+	address := e.getRegister32(ESP) - 4
 	e.setMemory32(address, value)
-	e.esp = address
+	e.setRegister32(ESP, address)
 }
 
 func (e *Emulator) pop32() uint32 {
-	value := e.getMemory32(e.esp)
-	e.esp += 4
+	value := e.getMemory32(e.getRegister32(ESP))
+	e.incRegister32(ESP, 4)
 	return value
 }
 
@@ -620,7 +615,7 @@ func (e *Emulator) ioOut8(address uint16, value uint8) {
 
 func (e *Emulator) leave() {
 	ebp := e.getRegister32(EBP)
-	e.esp = ebp
+	e.setRegister32(ESP, ebp)
 	e.setRegister32(EBP, e.pop32())
 	e.eip++
 }
@@ -634,19 +629,19 @@ func (e *Emulator) dump() {
 		"ECX=0x%08x "+
 		"EDX=0x%08x "+
 		"EBX=0x%08x "+
-		"ESI=0x%08x\n"+
+		"ESP=0x%08x\n"+
+		"ESI=0x%08x "+
 		"EDI=0x%08x "+
 		"EBP=0x%08x "+
-		"ESP=0x%08x "+
 		"EIP=0x%08x ",
 		e.registers[EAX],
 		e.registers[ECX],
 		e.registers[EDX],
 		e.registers[EBX],
+		e.registers[ESP],
 		e.registers[ESI],
 		e.registers[EDI],
 		e.registers[EBP],
-		e.esp,
 		e.eip,
 	)
 	color.New(color.FgGreen).Printf("(opecode=%x, %s)\n",
