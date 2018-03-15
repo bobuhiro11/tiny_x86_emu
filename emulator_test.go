@@ -87,6 +87,7 @@ func run(t *testing.T, filename string) *Emulator {
 		t.Fatal(err.Error())
 	}
 	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, true, map[uint64]string{})
+	e.cr[0] = 1 // 32bit mode
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}

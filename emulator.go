@@ -25,6 +25,10 @@ const (
 	CX = ECX
 	DX = EDX
 	BX = EBX
+	IP = 4
+	BP = EBP
+	SI = ESI
+	DI = EDI
 )
 
 // 8bit register
@@ -50,6 +54,8 @@ const (
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
 	registers   [8]uint32         // general registers
+	cr          [16]uint32        // controll registers
+	sreg        [4]uint32         // segment registers
 	eflags      uint32            // eflags
 	memory      []uint8           // physical memory
 	eip         uint32            // program counter
@@ -107,6 +113,8 @@ func (e *Emulator) execInst() error {
 		e.movR8Rm8()
 	case 0x8B:
 		e.movR32Rm32()
+	case 0x8E:
+		e.movSregRm16() // 16 bit mode
 	case 0xB0:
 		e.movR8Imm8()
 	case 0x90:
@@ -120,7 +128,11 @@ func (e *Emulator) execInst() error {
 	case 0xEB:
 		e.shortJmp()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
-		e.movR32Imm32()
+		if e.cr[0]&1 == 0 {
+			e.movR16Imm16()
+		} else {
+			e.movR32Imm32()
+		}
 	case 0xE8:
 		e.callRel32()
 	case 0xE9:
@@ -139,6 +151,13 @@ func (e *Emulator) execInst() error {
 
 func (e *Emulator) nop() {
 	e.eip++
+}
+
+func (e *Emulator) movR16Imm16() {
+	reg := e.getCode8(0) - 0xB8
+	value := e.getCode16(1)
+	e.setRegister16(reg, value)
+	e.eip += 3
 }
 
 func (e *Emulator) movR32Imm32() {
@@ -234,6 +253,14 @@ func (e *Emulator) movR32Rm32() {
 	m := e.parseModRM()
 	rm32 := e.getRm32(m)
 	e.setR32(m, rm32)
+}
+
+// 16 bit mode
+func (e *Emulator) movSregRm16() {
+	e.eip++
+	m := e.parseModRM()
+	rm16 := e.getRm16(m)
+	e.setSreg16(m, rm16)
 }
 
 func (e *Emulator) movR8Rm8() {
@@ -416,6 +443,14 @@ func (e *Emulator) getRm32(m ModRM) uint32 {
 	return e.getMemory32(address)
 }
 
+func (e *Emulator) getRm16(m ModRM) uint16 {
+	if m.mod == 3 {
+		return e.getRegister16(m.rm) // TODO check OK?
+	}
+	address := e.calcMemoryAddress(m)
+	return e.getMemory16(address)
+}
+
 func (e *Emulator) getRm8(m ModRM) uint8 {
 	if m.mod == 3 {
 		return e.getRegister8(m.rm) // TODO check OK?
@@ -434,6 +469,10 @@ func (e *Emulator) getR8(m ModRM) uint8 {
 
 func (e *Emulator) setR32(m ModRM, value uint32) {
 	e.setRegister32(m.opecode, value)
+}
+
+func (e *Emulator) setSreg16(m ModRM, value uint16) {
+	e.sreg[m.opecode] = uint32(value)
 }
 
 func (e *Emulator) setR8(m ModRM, value uint8) {
@@ -479,12 +518,27 @@ func (e *Emulator) setRegister32(rm uint8, value uint32) {
 	}
 }
 
+func (e *Emulator) setRegister16(rm uint8, value uint16) {
+	if rm == 4 {
+		e.esp = (e.esp & 0xFFFF0000) | uint32(value)
+	} else {
+		e.registers[rm] = (e.registers[rm] & 0xFFFF0000) | uint32(value)
+	}
+}
+
 func (e *Emulator) getRegister32(rm uint8) uint32 {
 	// TODO: e.esp should be moved to e.registers
 	if rm == 4 {
 		return e.esp
 	}
 	return e.registers[rm]
+}
+
+func (e *Emulator) getRegister16(rm uint8) uint16 {
+	if rm == 4 {
+		return uint16(e.esp)
+	}
+	return uint16(e.registers[rm] & 0xffff)
 }
 
 func (e *Emulator) getRegister8(rm uint8) uint8 {
@@ -514,6 +568,14 @@ func (e *Emulator) setMemory32(address, value uint32) {
 
 func (e *Emulator) getMemory8(address uint32) uint8 {
 	return e.memory[address]
+}
+
+func (e *Emulator) getMemory16(address uint32) uint16 {
+	var ret uint16
+	for i := uint32(0); i < 2; i++ {
+		ret |= uint16(e.getMemory8(address+i)) << uint32(i*8)
+	}
+	return ret
 }
 
 func (e *Emulator) getMemory32(address uint32) uint32 {
@@ -609,6 +671,14 @@ func (e *Emulator) getSignCode8(index int32) int8 {
 
 func (e *Emulator) getSignCode32(index int32) int32 {
 	return int32(e.getCode32(index))
+}
+
+func (e *Emulator) getCode16(index int32) uint16 {
+	var ret uint16
+	for i := int32(0); i < 4; i++ {
+		ret |= uint16(e.getCode8(index+i)) << uint32(i*8)
+	}
+	return ret
 }
 
 func (e *Emulator) getCode32(index int32) uint32 {
