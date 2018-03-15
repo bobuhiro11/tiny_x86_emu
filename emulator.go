@@ -117,7 +117,7 @@ func (e *Emulator) execInst() error {
 		e.movR32Rm32()
 	case 0x8E:
 		e.movSregRm16() // 16 bit mode
-	case 0xB0:
+	case 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7:
 		e.movR8Imm8()
 	case 0x90:
 		e.nop()
@@ -127,6 +127,8 @@ func (e *Emulator) execInst() error {
 		e.movRm32Imm32()
 	case 0xC9:
 		e.leave()
+	case 0xCD:
+		e.intImm8()
 	case 0xEB:
 		e.shortJmp()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
@@ -136,13 +138,19 @@ func (e *Emulator) execInst() error {
 			e.movR32Imm32()
 		}
 	case 0xE8:
-		e.callRel32()
+		if e.cr[0]&1 == 0 {
+			e.callRel16()
+		} else {
+			e.callRel32()
+		}
 	case 0xE9:
 		e.jmpRel32()
 	case 0xEC:
 		e.inAlDx()
 	case 0xEE:
 		e.outAlDx()
+	case 0xF4:
+		e.halt()
 	case 0xFF:
 		e.codeFf()
 	default:
@@ -153,6 +161,19 @@ func (e *Emulator) execInst() error {
 
 func (e *Emulator) nop() {
 	e.eip++
+}
+
+func (e *Emulator) intImm8() {
+	value := e.getCode8(1)
+	if value == 0x10 && e.getRegister16(AX) == 0x13 {
+		// TODO: change video mode, 16color, 80x25
+	} else if value == 0x10 && e.getRegister8(AH) == 0x0e {
+		charCode := e.getRegister8(AL)
+		fmt.Printf("%c", charCode)
+	} else {
+		panic(fmt.Sprintf("int not implemented"))
+	}
+	e.eip += 2
 }
 
 func (e *Emulator) movR16Imm16() {
@@ -343,6 +364,16 @@ func (e *Emulator) pushImm8() {
 	e.eip += 2
 }
 
+func (e *Emulator) callRel16() {
+	diff := e.getSingedCode16(1)
+	e.push32(e.eip + 3)
+	if diff < 0 {
+		e.eip = e.eip - uint32(-diff) + uint32(3)
+	} else {
+		e.eip = e.eip + uint32(diff) + uint32(3)
+	}
+}
+
 func (e *Emulator) callRel32() {
 	diff := e.getSingedCode32(1)
 	e.push32(e.eip + 5)
@@ -432,7 +463,7 @@ func (e *Emulator) setRm32(m ModRM, value uint32) {
 	if m.mod == 3 {
 		e.setRegister32(m.rm, value)
 	} else {
-		address := e.calcMemoryAddress(m)
+		address := e.calcMemoryAddress32(m)
 		e.setMemory32(address, value)
 	}
 }
@@ -441,7 +472,7 @@ func (e *Emulator) getRm32(m ModRM) uint32 {
 	if m.mod == 3 {
 		return e.getRegister32(m.rm)
 	}
-	address := e.calcMemoryAddress(m)
+	address := e.calcMemoryAddress32(m)
 	return e.getMemory32(address)
 }
 
@@ -449,7 +480,7 @@ func (e *Emulator) getRm16(m ModRM) uint16 {
 	if m.mod == 3 {
 		return e.getRegister16(m.rm) // TODO check OK?
 	}
-	address := e.calcMemoryAddress(m)
+	address := e.calcMemoryAddress32(m)
 	return e.getMemory16(address)
 }
 
@@ -457,7 +488,10 @@ func (e *Emulator) getRm8(m ModRM) uint8 {
 	if m.mod == 3 {
 		return e.getRegister8(m.rm) // TODO check OK?
 	}
-	address := e.calcMemoryAddress(m)
+	address := e.calcMemoryAddress32(m)
+	if e.cr[0]&1 == 0 {
+		address = uint32(e.calcMemoryAddress16(m))
+	}
 	return e.getMemory8(address)
 }
 
@@ -485,17 +519,58 @@ func (e *Emulator) setRm8(m ModRM, value uint8) {
 	if m.mod == 3 {
 		e.setRegister8(m.rm, value)
 	} else {
-		address := e.calcMemoryAddress(m)
+		address := e.calcMemoryAddress32(m)
 		e.setMemory8(address, value)
 	}
 }
 
-func (e *Emulator) calcMemoryAddress(m ModRM) uint32 {
+func (e *Emulator) calcMemoryAddress16(m ModRM) uint16 {
+	if m.mod == 0 {
+		// [register + resiger]
+		switch m.rm {
+		case 0:
+			return e.getRegister16(BX) + e.getRegister16(SI)
+		case 1:
+			return e.getRegister16(BX) + e.getRegister16(DI)
+		case 2:
+			return e.getRegister16(BP) + e.getRegister16(SI)
+		case 3:
+			return e.getRegister16(BP) + e.getRegister16(DI)
+		case 4:
+			return e.getRegister16(SI)
+		case 5:
+			return e.getRegister16(DI)
+		case 6:
+			return uint16(m.getDisp16())
+		case 7:
+			return e.getRegister16(BX)
+		}
+	} else if m.mod == 1 {
+		// [register + disp8]
+		if m.rm == 6 {
+			return uint16(int32(e.getRegister16(BP)) + int32(m.getDisp8()))
+		}
+		m.mod = 0
+		return uint16(int32(e.calcMemoryAddress16(m)) + int32(m.getDisp8()))
+	} else if m.mod == 2 {
+		// [redister + disp16]
+		if m.rm == 6 {
+			return uint16(int32(e.getRegister16(BP)) + int32(m.getDisp16()))
+		}
+		m.mod = 0
+		return uint16(int32(e.calcMemoryAddress16(m)) + int32(m.getDisp16()))
+	}
+	// register
+	panic("ModRM mod = 4 is not implemented")
+}
+
+func (e *Emulator) calcMemoryAddress32(m ModRM) uint32 {
 	if m.mod == 0 {
 		// [register + resiger]
 		if m.rm == 5 {
 			return m.disp32 // Is this a EBP?
 		}
+
 		return e.getRegister32(m.rm)
 	} else if m.mod == 1 {
 		// [register + disp8]
@@ -613,6 +688,12 @@ func (e *Emulator) ioOut8(address uint16, value uint8) {
 	}
 }
 
+func (e *Emulator) halt() {
+	e.eip++
+	fmt.Printf("The system has halted.\n")
+	os.Exit(0)
+}
+
 func (e *Emulator) leave() {
 	ebp := e.getRegister32(EBP)
 	e.setRegister32(ESP, ebp)
@@ -664,6 +745,10 @@ func (e *Emulator) getSignCode8(index int32) int8 {
 	return int8(e.getCode8(index))
 }
 
+func (e *Emulator) getSignCode16(index int32) int16 {
+	return int16(e.getCode16(index))
+}
+
 func (e *Emulator) getSignCode32(index int32) int32 {
 	return int32(e.getCode32(index))
 }
@@ -686,6 +771,10 @@ func (e *Emulator) getCode32(index int32) uint32 {
 
 func (e *Emulator) getSingedCode32(index int32) int32 {
 	return int32(e.getCode32(index))
+}
+
+func (e *Emulator) getSingedCode16(index int32) int16 {
+	return int16(e.getCode16(index))
 }
 
 func (e *Emulator) updateEflagsSub(v1, v2 uint32, result uint64) {
@@ -717,15 +806,23 @@ type ModRM struct {
 	opecode uint8 // This can be regarded as regIndex.
 	rm      uint8
 	sib     uint8
-	disp32  uint32 // This can be regarded as (disp8, signed int8).
+	disp32  uint32 // This can be regarded as (disp8, signed int8, disp16 signed int16).
 }
 
 func (m *ModRM) getDisp8() int8 {
 	return int8(m.disp32 & 0xff)
 }
 
+func (m *ModRM) getDisp16() int16 {
+	return int16(m.disp32 & 0xffff)
+}
+
 func (m *ModRM) setDisp8(disp8 int8) {
 	m.disp32 = (m.disp32 & 0xFFFFFF00) | uint32(disp8)
+}
+
+func (m *ModRM) setDisp16(disp16 int16) {
+	m.disp32 = (m.disp32 & 0xFFFF0000) | uint32(disp16)
 }
 
 // load ModR/M & increment eip
@@ -742,17 +839,29 @@ func (e *Emulator) parseModRM() ModRM {
 
 	e.eip++
 
-	if m.mod != 3 && m.rm == 4 {
-		m.sib = e.getCode8(0)
-		e.eip++
-	}
+	if e.cr[0]&1 == 0 {
+		// 16 bit mode
+		if m.mod == 1 {
+			m.setDisp8(e.getSignCode8(0))
+			e.eip++
+		} else if m.rm == 6 || m.mod == 2 {
+			m.setDisp16(e.getSignCode16(0))
+			e.eip += 2
+		}
+	} else {
+		// 32 bit mode
+		if m.mod != 3 && m.rm == 4 {
+			m.sib = e.getCode8(0)
+			e.eip++
+		}
 
-	if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
-		m.disp32 = e.getCode32(0) // Is this a bug on the book?
-		e.eip += 4
-	} else if m.mod == 1 {
-		m.setDisp8(e.getSignCode8(0))
-		e.eip++
+		if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
+			m.disp32 = e.getCode32(0)
+			e.eip += 4
+		} else if m.mod == 1 {
+			m.setDisp8(e.getSignCode8(0))
+			e.eip++
+		}
 	}
 
 	return m
