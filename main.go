@@ -55,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 	// disasm binary
-	b, err := exec.Command("ndisasm", "-b", "16", *filename, "-o", "0x7c00").CombinedOutput()
+	b, err := exec.Command("sh", "-c", "ndisasm -b 16 "+*filename+" -o 0x7c00 | head -n 1000").CombinedOutput()
 	disasm := map[uint64]string{}
 	if err != nil {
 		panic(err)
@@ -75,10 +75,11 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("enable GUI = %#v\n", *enableGUI)
+	fmt.Printf("len(bytes) = %d\n", len(bytes))
 	fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x8000, true, *silent, os.Stdin, os.Stdout, disasm)
+	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x8000, true, *silent, os.Stdin, os.Stdout, disasm)
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}

@@ -91,8 +91,8 @@ func TestMbr(t *testing.T) {
 	_, actual := run(t, "guest/mbr.bin", 0)
 
 	expected := "Congratulations!\x0d\x0a" +
-		"You are on a way to hacker!!\x0d\x0a" +
-		"The system has halted.\x0a"
+	"You are on a way to hacker!!\x0d\x0a" +
+	"The system has halted.\x0a"
 
 	if expected != actual {
 		t.Fatalf("\nexpected=%x\nactual  =%x\n", expected, actual)
@@ -126,6 +126,6 @@ func run(t *testing.T, filename string, cr0 uint32) (*Emulator, string) {
 func assetRegister32(t *testing.T, e *Emulator, name string, index uint8, expected uint32) {
 	if e.getRegister32(index) != expected {
 		t.Fatalf("Bad %s, expected=%08x, actual=%08x\n",
-			name, expected, e.getRegister32(index))
+		name, expected, e.getRegister32(index))
 	}
 }

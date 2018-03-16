@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"io"
+	"math/bits"
 	"os"
 )
 
@@ -47,10 +48,12 @@ const (
 
 // eflags
 const (
-	CARRY    = 1 << 0
-	ZERO     = 1 << 6
-	SIGN     = 1 << 7
-	OVERFLOW = 1 << 11
+	CARRY    = uint32(1) << 0
+	PF       = uint32(1) << 2
+	ZERO     = uint32(1) << 6
+	SIGN     = uint32(1) << 7
+	IF       = uint32(1) << 9 // interrupt enable flag
+	OVERFLOW = uint32(1) << 11
 )
 
 // Emulator is an i386 Virtual Machine
@@ -89,6 +92,12 @@ func (e *Emulator) execInst() error {
 	switch e.getCode8(0) {
 	case 0x01:
 		e.addRm32R32()
+	case 0x31:
+		if e.cr[0]&1 == 0 {
+			e.xorRm16R16()
+		} else {
+			e.xorRm32R32()
+		}
 	case 0x3b:
 		e.cmpR32Rm32()
 	case 0x3c:
@@ -105,6 +114,8 @@ func (e *Emulator) execInst() error {
 		e.pushImm8()
 	case 0x74:
 		e.jz()
+	case 0x75:
+		e.jnz()
 	case 0x78:
 		e.js()
 	case 0x7E:
@@ -119,6 +130,14 @@ func (e *Emulator) execInst() error {
 		e.movR8Rm8()
 	case 0x8B:
 		e.movR32Rm32()
+	case 0xA8:
+		e.testAlImm8()
+	case 0xA9:
+		if e.cr[0]&1 == 0 {
+			e.testAxImm16()
+		} else {
+			e.testEaxImm32()
+		}
 	case 0x8E:
 		e.movSregRm16() // 16 bit mode
 	case 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7:
@@ -135,6 +154,16 @@ func (e *Emulator) execInst() error {
 		e.intImm8()
 	case 0xEB:
 		e.shortJmp()
+	case 0xE4:
+		e.inAlImm8()
+	case 0xE5:
+		if e.cr[0]&1 == 0 {
+			e.inAxImm8()
+		} else {
+			e.inEaxImm8()
+		}
+	case 0xE6:
+		e.outAlImm8()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
 		if e.cr[0]&1 == 0 {
 			e.movR16Imm16()
@@ -155,6 +184,8 @@ func (e *Emulator) execInst() error {
 		e.outAlDx()
 	case 0xF4:
 		e.halt()
+	case 0xFA:
+		e.cli()
 	case 0xFF:
 		e.codeFf()
 	default:
@@ -164,6 +195,11 @@ func (e *Emulator) execInst() error {
 }
 
 func (e *Emulator) nop() {
+	e.eip++
+}
+
+func (e *Emulator) cli() {
+	e.eflags |= IF
 	e.eip++
 }
 
@@ -178,6 +214,38 @@ func (e *Emulator) intImm8() {
 		panic(fmt.Sprintf("int not implemented"))
 	}
 	e.eip += 2
+}
+
+func (e *Emulator) outAlImm8() {
+	ioAddress := e.getCode8(1)
+	e.getRegister16(AL)
+	if ioAddress == 0x60 {
+		// keyboard input register
+		e.eip += 2
+	} else if ioAddress == 0x64 {
+		// keyboard command register
+		e.eip += 2
+	} else {
+		panic(fmt.Sprintf("inAlImm8 not implemented"))
+	}
+}
+
+func (e *Emulator) inAlImm8() {
+	ioAddress := e.getCode8(1)
+	if ioAddress == 0x64 {
+		e.setRegister8(AL, 0x0) // keyboard status register. 0x0 means not busy.
+		e.eip += 2
+	} else {
+		panic(fmt.Sprintf("inAlImm8 not implemented"))
+	}
+}
+
+func (e *Emulator) inAxImm8() {
+	panic(fmt.Sprintf("inAxImm8 not implemented"))
+}
+
+func (e *Emulator) inEaxImm8() {
+	panic(fmt.Sprintf("inEaxImm8 not implemented"))
 }
 
 func (e *Emulator) movR16Imm16() {
@@ -260,6 +328,18 @@ func (e *Emulator) movRm8R8() {
 	e.setRm8(m, r8)
 }
 
+func (e *Emulator) xorRm16R16() {
+	e.eip++
+	m := e.parseModRM()
+	e.setRm16(m, e.getRm16(m)^e.getR16(m))
+}
+
+func (e *Emulator) xorRm32R32() {
+	e.eip++
+	m := e.parseModRM()
+	e.setRm32(m, e.getRm32(m)^e.getR32(m))
+}
+
 func (e *Emulator) movRm32R32() {
 	e.eip++
 	m := e.parseModRM()
@@ -310,6 +390,51 @@ func (e *Emulator) cmpR32Rm32() {
 	rm32 := e.getRm32(m)
 	result := uint64(r32) - uint64(rm32)
 	e.updateEflagsSub(r32, rm32, result)
+}
+
+func (e *Emulator) testEaxImm32() {
+	ax := e.getRegister32(EAX)
+	value := e.getCode32(1)
+	result := ax & value
+	if result == 0 {
+		e.eflags |= ZERO
+	} else {
+		e.eflags &= ^ZERO
+	}
+	e.eflags &= ^CARRY
+	e.eflags &= ^OVERFLOW
+	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eip += 5
+}
+
+func (e *Emulator) testAxImm16() {
+	ax := uint32(e.getRegister16(AX))
+	value := uint32(e.getCode16(1))
+	result := ax & value
+	if result == 0 {
+		e.eflags |= ZERO
+	} else {
+		e.eflags &= ^ZERO
+	}
+	e.eflags &= ^CARRY
+	e.eflags &= ^OVERFLOW
+	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eip += 3
+}
+
+func (e *Emulator) testAlImm8() {
+	al := uint32(e.getRegister8(AL))
+	value := uint32(e.getCode8(1))
+	result := al & value
+	if result == 0 {
+		e.eflags |= ZERO
+	} else {
+		e.eflags &= ^ZERO
+	}
+	e.eflags &= ^CARRY
+	e.eflags &= ^OVERFLOW
+	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eip += 2
 }
 
 func (e *Emulator) cmpAlImm8() {
@@ -390,6 +515,14 @@ func (e *Emulator) callRel32() {
 
 func (e *Emulator) ret() {
 	e.eip = e.pop32()
+}
+
+func (e *Emulator) jnz() {
+	if e.getEflag(ZERO) {
+		e.eip += uint32(2)
+	} else {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
+	}
 }
 
 func (e *Emulator) jz() {
@@ -480,6 +613,15 @@ func (e *Emulator) getRm32(m ModRM) uint32 {
 	return e.getMemory32(address)
 }
 
+func (e *Emulator) setRm16(m ModRM, value uint16) {
+	if m.mod == 3 {
+		e.setRegister16(m.rm, value)
+	} else {
+		address := uint32(e.calcMemoryAddress16(m))
+		e.setMemory16(address, value)
+	}
+}
+
 func (e *Emulator) getRm16(m ModRM) uint16 {
 	if m.mod == 3 {
 		return e.getRegister16(m.rm) // TODO check OK?
@@ -501,6 +643,10 @@ func (e *Emulator) getRm8(m ModRM) uint8 {
 
 func (e *Emulator) getR32(m ModRM) uint32 {
 	return e.getRegister32(m.opecode)
+}
+
+func (e *Emulator) getR16(m ModRM) uint16 {
+	return e.getRegister16(m.opecode)
 }
 
 func (e *Emulator) getR8(m ModRM) uint8 {
@@ -634,6 +780,12 @@ func (e *Emulator) setMemory8(address uint32, value uint8) {
 	e.memory[address] = value
 }
 
+func (e *Emulator) setMemory16(address uint32, value uint16) {
+	for i := uint32(0); i < 2; i++ {
+		e.setMemory8(address+i, uint8(value>>uint32(i*8)&0xFF))
+	}
+}
+
 func (e *Emulator) setMemory32(address, value uint32) {
 	for i := uint32(0); i < 4; i++ {
 		e.setMemory8(address+i, uint8(value>>uint32(i*8)&0xFF))
@@ -730,6 +882,7 @@ func (e *Emulator) dump() {
 	)
 	color.New(color.FgGreen).Printf("(opecode=%x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
+	color.New(color.FgCyan).Printf("EFLAGS=0x%08x\n", e.eflags)
 }
 
 // get text segment
@@ -778,6 +931,15 @@ func (e *Emulator) getSingedCode32(index int32) int32 {
 
 func (e *Emulator) getSingedCode16(index int32) int16 {
 	return int16(e.getCode16(index))
+}
+
+func (e *Emulator) updateEflagsPf(result uint8) {
+	popcnt := bits.OnesCount8(result)
+	if popcnt%2 == 0 {
+		e.eflags |= PF
+	} else {
+		e.eflags &= ^PF
+	}
 }
 
 func (e *Emulator) updateEflagsSub(v1, v2 uint32, result uint64) {

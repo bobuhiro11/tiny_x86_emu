@@ -1,13 +1,16 @@
 rebuild: clean build
 build:
 	go build
-test: guest_bin
+test: guest_bin xv6
 	pkgs=$(go list ./... | grep -v /vendor/)
 	go vet ${pkgs}
 	golint ${pkgs}
 	go test ${pkgs} -v --cover
 clean:
 	go clean
+xv6:
+	if [ ! -d xv6-public ]; then git clone --depth 1 https://github.com/mit-pdos/xv6-public.git; fi
+	make -C ./xv6-public
 guest_bin:
 	# binary from gcc
 	gcc -Wl,--entry=inc,--oformat=binary -nostdlib -fno-asynchronous-unwind-tables \
