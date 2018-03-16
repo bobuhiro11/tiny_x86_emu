@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fatih/color"
+	"io"
 	"os"
 )
 
@@ -54,25 +55,28 @@ const (
 
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
-	registers [8]uint32  // general registers
-	cr        [16]uint32 // controll registers
-	sreg      [4]uint32  // segment registers
-	eflags    uint32     // eflags
-	memory    []uint8    // physical memory
-	eip       uint32     // program counter
-	// esp         uint32            // stack pointer (#reg = 4)
-	is32bitmode bool              // if this value is false, the enulator work as 16 bit mode
-	isSilent    bool              // silent mode
+	registers   [8]uint32  // general registers
+	cr          [16]uint32 // controll registers
+	sreg        [4]uint32  // segment registers
+	eflags      uint32     // eflags
+	memory      []uint8    // physical memory
+	eip         uint32     // program counter
+	is32bitmode bool       // if this value is false, the enulator work as 16 bit mode
+	isSilent    bool       // silent mode
+	reader      io.Reader
+	writer      io.Writer
 	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
 // NewEmulator creates New Emulator
-func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, disasm map[uint64]string) *Emulator {
+func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
 	e := &Emulator{
 		memory:      make([]uint8, memorySize),
 		eip:         eip,
 		is32bitmode: is32bitmode,
 		isSilent:    isSilent,
+		reader:      reader,
+		writer:      writer,
 		disasm:      disasm,
 	}
 	e.registers[ESP] = esp
@@ -169,7 +173,7 @@ func (e *Emulator) intImm8() {
 		// TODO: change video mode, 16color, 80x25
 	} else if value == 0x10 && e.getRegister8(AH) == 0x0e {
 		charCode := e.getRegister8(AL)
-		fmt.Printf("%c", charCode)
+		fmt.Fprintf(e.writer, "%c", charCode)
 	} else {
 		panic(fmt.Sprintf("int not implemented"))
 	}
@@ -682,16 +686,15 @@ func (e *Emulator) ioIn8(address uint16) uint8 {
 func (e *Emulator) ioOut8(address uint16, value uint8) {
 	switch address {
 	case 0x03f8:
-		fmt.Print(string(value))
+		fmt.Fprint(e.writer, string(value))
 	default:
 		return
 	}
 }
 
 func (e *Emulator) halt() {
-	e.eip++
-	fmt.Printf("The system has halted.\n")
-	os.Exit(0)
+	fmt.Fprintf(e.writer, "The system has halted.\n")
+	e.eip = 0x7c00
 }
 
 func (e *Emulator) leave() {

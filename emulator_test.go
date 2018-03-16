@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"testing"
 )
 
 func TestAddJmp(t *testing.T) {
-	e := run(t, "guest/addjmp.bin")
+	e, _ := run(t, "guest/addjmp.bin", 1)
 	assetRegister32(t, e, "EAX", EAX, 0x0029)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -16,7 +17,7 @@ func TestAddJmp(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	e := run(t, "guest/call-test.bin")
+	e, _ := run(t, "guest/call-test.bin", 1)
 	assetRegister32(t, e, "EAX", EAX, 0x00f1)
 	assetRegister32(t, e, "ECX", ECX, 0x011a)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -38,7 +39,7 @@ func TestCall(t *testing.T) {
 // }
 
 func TestModRM(t *testing.T) {
-	e := run(t, "guest/modrm-test.bin")
+	e, _ := run(t, "guest/modrm-test.bin", 1)
 	assetRegister32(t, e, "EAX", EAX, 0x0002)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -49,7 +50,7 @@ func TestModRM(t *testing.T) {
 }
 
 func Test132(t *testing.T) {
-	e := run(t, "guest/test132.bin")
+	e, _ := run(t, "guest/test132.bin", 1)
 	assetRegister32(t, e, "EAX", EAX, 0x0003)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -60,7 +61,7 @@ func Test132(t *testing.T) {
 }
 
 func Test133(t *testing.T) {
-	e := run(t, "guest/test133.bin")
+	e, _ := run(t, "guest/test133.bin", 1)
 	assetRegister32(t, e, "EAX", EAX, 0x0037)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -71,7 +72,12 @@ func Test133(t *testing.T) {
 }
 
 func Test141(t *testing.T) {
-	e := run(t, "guest/test141.bin")
+	e, actual := run(t, "guest/test141.bin", 1)
+	expected := "A\x0a"
+
+	if actual != expected {
+		t.Fatalf("expected=%x actual=%x", expected, actual)
+	}
 	assetRegister32(t, e, "EAX", EAX, 0x000a)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x03f8)
@@ -81,15 +87,29 @@ func Test141(t *testing.T) {
 	assetRegister32(t, e, "EBP", EBP, 0x0000)
 }
 
-func run(t *testing.T, filename string) *Emulator {
-	bytes, err := loadFile(filename)
+func TestMbr(t *testing.T) {
+	_, actual := run(t, "guest/mbr.bin", 0)
+
+	expected := "Congratulations!\x0d\x0a" +
+		"You are on a way to hacker!!\x0d\x0a" +
+		"The system has halted.\x0a"
+
+	if expected != actual {
+		t.Fatalf("\nexpected=%x\nactual  =%x\n", expected, actual)
+	}
+}
+
+func run(t *testing.T, filename string, cr0 uint32) (*Emulator, string) {
+	bin, err := loadFile(filename)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, true, map[uint64]string{})
-	e.cr[0] = 1 // 32bit mode
-	for i := 0; i < len(bytes); i++ {
-		e.memory[i+0x7c00] = bytes[i]
+	reader := &bytes.Buffer{}
+	writer := &bytes.Buffer{}
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, true, reader, writer, map[uint64]string{})
+	e.cr[0] = cr0
+	for i := 0; i < len(bin); i++ {
+		e.memory[i+0x7c00] = bin[i]
 	}
 	for e.eip < 0x7c00+0x10000 {
 		err := e.execInst()
@@ -100,7 +120,7 @@ func run(t *testing.T, filename string) *Emulator {
 			break
 		}
 	}
-	return e
+	return e, writer.String()
 }
 
 func assetRegister32(t *testing.T, e *Emulator, name string, index uint8, expected uint32) {
