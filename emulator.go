@@ -62,12 +62,14 @@ type Emulator struct {
 	cr          [16]uint32 // controll registers
 	sreg        [4]uint32  // segment registers
 	eflags      uint32     // eflags
+	gdtrSize	uint16     // global table descriptor table's size
+	gdtrBase	uint32     // global table descriptor table's base phys address
 	memory      []uint8    // physical memory
 	eip         uint32     // program counter
-	is32bitmode bool       // if this value is false, the enulator work as 16 bit mode
 	isSilent    bool       // silent mode
 	reader      io.Reader
 	writer      io.Writer
+	operandSizeOverride bool  // true if operand size override (0x66) is enabled
 	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
@@ -76,13 +78,15 @@ func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, reader
 	e := &Emulator{
 		memory:      make([]uint8, memorySize),
 		eip:         eip,
-		is32bitmode: is32bitmode,
 		isSilent:    isSilent,
 		reader:      reader,
 		writer:      writer,
 		disasm:      disasm,
 	}
 	e.registers[ESP] = esp
+	if is32bitmode{
+		e.cr[0] |= 1
+	}
 	return e
 }
 
@@ -92,6 +96,8 @@ func (e *Emulator) execInst() error {
 	switch e.getCode8(0) {
 	case 0x01:
 		e.addRm32R32()
+	case 0x0F:
+		e.code0f()
 	case 0x31:
 		if e.cr[0]&1 == 0 {
 			e.xorRm16R16()
@@ -110,6 +116,11 @@ func (e *Emulator) execInst() error {
 		e.pushR32()
 	case 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f:
 		e.popR32()
+	case 0x66:
+		e.operandSizeOverride = true
+		e.eip++
+		e.execInst()
+		e.operandSizeOverride = false
 	case 0x6a:
 		e.pushImm8()
 	case 0x74:
@@ -203,6 +214,37 @@ func (e *Emulator) cli() {
 	e.eip++
 }
 
+func (e *Emulator) code0f() {
+	lgdt := func() {
+		m := e.parseModRM()
+		address := uint32(e.calcMemoryAddress16(m))
+		e.gdtrSize = e.getMemory16(address)
+		e.gdtrBase = e.getMemory32(address+2)
+		fmt.Printf("address=0x%x gdtr size=0x%x gdtr base=0x%x\n",
+		address, e.gdtrSize, e.gdtrBase)
+	}
+	movR32Cr0 := func() {
+		m := e.parseModRM()
+		e.setR32(m, e.cr[0])
+	}
+	movCr0R32 := func() {
+		m := e.parseModRM()
+		e.cr[0] = e.getR32(m)
+	}
+
+	second := e.getCode8(1)
+	e.eip+=2
+	if second == 0x01 {
+		lgdt()
+	} else if second == 0x20 {
+		movR32Cr0()
+	} else if second == 0x22 {
+		movCr0R32()
+	} else {
+		panic(fmt.Sprintf("0x0F 0x%x is not implemented\n",second))
+	}
+}
+
 func (e *Emulator) intImm8() {
 	value := e.getCode8(1)
 	if value == 0x10 && e.getRegister16(AX) == 0x13 {
@@ -285,6 +327,12 @@ func (e *Emulator) code83() {
 		e.eip++
 		e.setRm32(m, rm32+imm8)
 	}
+	orRm32Imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm8 := uint32(e.getSignCode8(0))
+		e.eip++
+		e.setRm32(m, rm32 | uint32(imm8))
+	}
 	cmpRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm8 := uint32(e.getSignCode8(0))
@@ -294,9 +342,17 @@ func (e *Emulator) code83() {
 	}
 	e.eip++
 	m := e.parseModRM()
+	
+	if (e.cr[0] & 1 ==0 && e.operandSizeOverride == false ||
+		e.cr[1] & 1 == 1 && e.operandSizeOverride == true) {
+		panic("16bit mode is not implemented")
+	}
+
 	switch m.opecode {
 	case 0:
 		addRm32Imm8(e, m)
+	case 1:
+		orRm32Imm8(e,m)
 	case 5:
 		subRm32Imm8(e, m)
 	case 7:
@@ -993,6 +1049,7 @@ func (m *ModRM) setDisp16(disp16 int16) {
 // load ModR/M & increment eip
 func (e *Emulator) parseModRM() ModRM {
 	code := e.getCode8(0)
+	fmt.Printf("modrm=0x%x\n", code)
 
 	// 76  543                210
 	// mod regIndex(opecode) r/m
@@ -1012,6 +1069,7 @@ func (e *Emulator) parseModRM() ModRM {
 		} else if m.rm == 6 || m.mod == 2 {
 			m.setDisp16(e.getSignCode16(0))
 			e.eip += 2
+			fmt.Printf("set disp16 eip=0x%x\n", e.eip)
 		}
 	} else {
 		// 32 bit mode
