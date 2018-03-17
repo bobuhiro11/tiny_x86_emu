@@ -6,7 +6,7 @@ import (
 )
 
 func TestAddJmp(t *testing.T) {
-	e, _ := run(t, "guest/addjmp.bin", 1)
+	e, _ := run(t, "guest/addjmp.bin", true)
 	assetRegister32(t, e, "EAX", EAX, 0x0029)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -17,7 +17,7 @@ func TestAddJmp(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	e, _ := run(t, "guest/call-test.bin", 1)
+	e, _ := run(t, "guest/call-test.bin", true)
 	assetRegister32(t, e, "EAX", EAX, 0x00f1)
 	assetRegister32(t, e, "ECX", ECX, 0x011a)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -39,7 +39,7 @@ func TestCall(t *testing.T) {
 // }
 
 func TestModRM(t *testing.T) {
-	e, _ := run(t, "guest/modrm-test.bin", 1)
+	e, _ := run(t, "guest/modrm-test.bin", true)
 	assetRegister32(t, e, "EAX", EAX, 0x0002)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -50,7 +50,7 @@ func TestModRM(t *testing.T) {
 }
 
 func Test132(t *testing.T) {
-	e, _ := run(t, "guest/test132.bin", 1)
+	e, _ := run(t, "guest/test132.bin", true)
 	assetRegister32(t, e, "EAX", EAX, 0x0003)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -61,7 +61,7 @@ func Test132(t *testing.T) {
 }
 
 func Test133(t *testing.T) {
-	e, _ := run(t, "guest/test133.bin", 1)
+	e, _ := run(t, "guest/test133.bin", true)
 	assetRegister32(t, e, "EAX", EAX, 0x0037)
 	assetRegister32(t, e, "ECX", ECX, 0x0000)
 	assetRegister32(t, e, "EDX", EDX, 0x0000)
@@ -72,7 +72,7 @@ func Test133(t *testing.T) {
 }
 
 func Test141(t *testing.T) {
-	e, actual := run(t, "guest/test141.bin", 1)
+	e, actual := run(t, "guest/test141.bin", true)
 	expected := "A\x0a"
 
 	if actual != expected {
@@ -88,7 +88,7 @@ func Test141(t *testing.T) {
 }
 
 func TestMbr(t *testing.T) {
-	_, actual := run(t, "guest/mbr.bin", 0)
+	_, actual := run(t, "guest/mbr.bin", false)
 
 	expected := "Congratulations!\x0d\x0a" +
 	"You are on a way to hacker!!\x0d\x0a" +
@@ -99,15 +99,14 @@ func TestMbr(t *testing.T) {
 	}
 }
 
-func run(t *testing.T, filename string, cr0 uint32) (*Emulator, string) {
+func run(t *testing.T, filename string, protectedEnable bool) (*Emulator, string) {
 	bin, err := loadFile(filename)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	reader := &bytes.Buffer{}
 	writer := &bytes.Buffer{}
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, true, true, reader, writer, map[uint64]string{})
-	e.cr[0] = cr0
+	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, protectedEnable, true, reader, writer, map[uint64]string{})
 	for i := 0; i < len(bin); i++ {
 		e.memory[i+0x7c00] = bin[i]
 	}

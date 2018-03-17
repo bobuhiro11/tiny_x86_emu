@@ -70,12 +70,13 @@ type Emulator struct {
 	reader      io.Reader
 	writer      io.Writer
 	operandSizeOverride bool  // true if operand size override (0x66) is enabled
+	genuineProtectedEnable bool // procted mode is refreshed only when sreg is changed
 	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
 // NewEmulator creates New Emulator
-func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
-	e := &Emulator{
+	func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
+		e := &Emulator{
 		memory:      make([]uint8, memorySize),
 		eip:         eip,
 		isSilent:    isSilent,
@@ -84,8 +85,9 @@ func NewEmulator(memorySize, eip, esp uint32, is32bitmode, isSilent bool, reader
 		disasm:      disasm,
 	}
 	e.registers[ESP] = esp
-	if is32bitmode{
+	if protectedMode{
 		e.cr[0] |= 1
+		e.genuineProtectedEnable = true
 	}
 	return e
 }
@@ -99,10 +101,10 @@ func (e *Emulator) execInst() error {
 	case 0x0F:
 		e.code0f()
 	case 0x31:
-		if e.cr[0]&1 == 0 {
-			e.xorRm16R16()
-		} else {
+		if e.genuineProtectedEnable {
 			e.xorRm32R32()
+		} else {
+			e.xorRm16R16()
 		}
 	case 0x3b:
 		e.cmpR32Rm32()
@@ -144,10 +146,10 @@ func (e *Emulator) execInst() error {
 	case 0xA8:
 		e.testAlImm8()
 	case 0xA9:
-		if e.cr[0]&1 == 0 {
-			e.testAxImm16()
-		} else {
+		if e.genuineProtectedEnable {
 			e.testEaxImm32()
+		} else {
+			e.testAxImm16()
 		}
 	case 0x8E:
 		e.movSregRm16() // 16 bit mode
@@ -168,24 +170,24 @@ func (e *Emulator) execInst() error {
 	case 0xE4:
 		e.inAlImm8()
 	case 0xE5:
-		if e.cr[0]&1 == 0 {
-			e.inAxImm8()
-		} else {
+		if e.genuineProtectedEnable {
 			e.inEaxImm8()
+		} else {
+			e.inAxImm8()
 		}
 	case 0xE6:
 		e.outAlImm8()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
-		if e.cr[0]&1 == 0 {
-			e.movR16Imm16()
-		} else {
+		if e.genuineProtectedEnable {
 			e.movR32Imm32()
+		} else {
+			e.movR16Imm16()
 		}
 	case 0xE8:
-		if e.cr[0]&1 == 0 {
-			e.callRel16()
-		} else {
+		if e.genuineProtectedEnable {
 			e.callRel32()
+		} else {
+			e.callRel16()
 		}
 	case 0xE9:
 		e.jmpRel32()
@@ -343,8 +345,8 @@ func (e *Emulator) code83() {
 	e.eip++
 	m := e.parseModRM()
 	
-	if (e.cr[0] & 1 ==0 && e.operandSizeOverride == false ||
-		e.cr[1] & 1 == 1 && e.operandSizeOverride == true) {
+	if (e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+		e.genuineProtectedEnable == true && e.operandSizeOverride == true) {
 		panic("16bit mode is not implemented")
 	}
 
@@ -715,6 +717,11 @@ func (e *Emulator) setR32(m ModRM, value uint32) {
 
 func (e *Emulator) setSreg16(m ModRM, value uint16) {
 	e.sreg[m.opecode] = uint32(value)
+	if e.cr[0]&1 == 0x1 {
+		e.genuineProtectedEnable = true
+	} else {
+		e.genuineProtectedEnable = false
+	}
 }
 
 func (e *Emulator) setR8(m ModRM, value uint8) {
@@ -941,7 +948,7 @@ func (e *Emulator) dump() {
 	color.New(color.FgCyan).Printf("EFLAGS=0x%08x\n", e.eflags)
 }
 
-// get text segment
+// get from eip
 
 func (e *Emulator) getCode8(index int32) uint8 {
 	var addr uint32
@@ -1049,7 +1056,7 @@ func (m *ModRM) setDisp16(disp16 int16) {
 // load ModR/M & increment eip
 func (e *Emulator) parseModRM() ModRM {
 	code := e.getCode8(0)
-	fmt.Printf("modrm=0x%x\n", code)
+	// fmt.Printf("modrm=0x%x\n", code)
 
 	// 76  543                210
 	// mod regIndex(opecode) r/m
