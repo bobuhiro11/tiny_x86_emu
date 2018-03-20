@@ -222,8 +222,11 @@ func (e *Emulator) code0f() {
 		address := uint32(e.calcMemoryAddress16(m))
 		e.gdtrSize = e.getMemory16(address)
 		e.gdtrBase = e.getMemory32(address+2)
-		fmt.Printf("address=0x%x gdtr size=0x%x gdtr base=0x%x\n",
+		fmt.Printf("address=0x%x gdtrSize=0x%x gdtrBase=0x%x\n",
 		address, e.gdtrSize, e.gdtrBase)
+		e.dumpGDTEntry(e.gdtrBase)
+		e.dumpGDTEntry(e.gdtrBase + 8)
+		e.dumpGDTEntry(e.gdtrBase + 16)
 	}
 	movR32Cr0 := func() {
 		m := e.parseModRM()
@@ -654,6 +657,17 @@ func (e *Emulator) outAlDx() {
 }
 
 // util
+
+// dump GDT entry
+func (e *Emulator) dumpGDTEntry(physAddr uint32) {
+	entry := e.getMemory64(physAddr)
+	segmentBaseAddr := uint32((((entry >> 56)&0xFF)<<24) | (((entry >>32) & 0xFF)<<16) | ((entry>>16) & 0xFFFF))
+	segmentLimit := uint32((((entry>>48)&0xF) <<16) | (entry & 0xFFFF))
+	isCodeSegment := (entry>>43) & 1
+	fmt.Printf("GDTEntry[%d]={entryPhysAddr=0x%x segmentBaseAddr=0x%x segmentLimit=0x%x isCodeSegment=0x%x}\n",
+	(physAddr-e.gdtrBase)/8,physAddr, segmentBaseAddr,segmentLimit,isCodeSegment)
+}
+
 func (e *Emulator) setRm32(m ModRM, value uint32) {
 	if m.mod == 3 {
 		e.setRegister32(m.rm, value)
@@ -875,6 +889,14 @@ func (e *Emulator) getMemory32(address uint32) uint32 {
 	return ret
 }
 
+func (e *Emulator) getMemory64(address uint32) uint64 {
+	var ret uint64
+	for i := uint32(0); i < 8; i++ {
+		ret |= uint64(e.getMemory8(address+i)) << uint32(i*8)
+	}
+	return ret
+}
+
 func (e *Emulator) push32(value uint32) {
 	address := e.getRegister32(ESP) - 4
 	e.setMemory32(address, value)
@@ -1076,7 +1098,7 @@ func (e *Emulator) parseModRM() ModRM {
 		} else if m.rm == 6 || m.mod == 2 {
 			m.setDisp16(e.getSignCode16(0))
 			e.eip += 2
-			fmt.Printf("set disp16 eip=0x%x\n", e.eip)
+			// fmt.Printf("set disp16 eip=0x%x\n", e.eip)
 		}
 	} else {
 		// 32 bit mode
