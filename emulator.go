@@ -46,6 +46,15 @@ const (
 	BH = BL + 4
 )
 
+// segment register
+const (
+	ES=0
+	CS=1
+	SS=2
+	DS=3
+	GS=5
+)
+
 // eflags
 const (
 	CARRY    = uint32(1) << 0
@@ -60,7 +69,7 @@ const (
 type Emulator struct {
 	registers   [8]uint32  // general registers
 	cr          [16]uint32 // controll registers
-	sreg        [4]uint32  // segment registers
+	sreg        [6]uint32  // segment registers
 	eflags      uint32     // eflags
 	gdtrSize	uint16     // global table descriptor table's size
 	gdtrBase	uint32     // global table descriptor table's base phys address
@@ -101,7 +110,7 @@ func (e *Emulator) execInst() error {
 	case 0x0F:
 		e.code0f()
 	case 0x31:
-		if e.genuineProtectedEnable {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.xorRm32R32()
 		} else {
 			e.xorRm16R16()
@@ -146,7 +155,7 @@ func (e *Emulator) execInst() error {
 	case 0xA8:
 		e.testAlImm8()
 	case 0xA9:
-		if e.genuineProtectedEnable {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.testEaxImm32()
 		} else {
 			e.testAxImm16()
@@ -178,19 +187,21 @@ func (e *Emulator) execInst() error {
 	case 0xE6:
 		e.outAlImm8()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
-		if e.genuineProtectedEnable {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.movR32Imm32()
 		} else {
 			e.movR16Imm16()
 		}
 	case 0xE8:
-		if e.genuineProtectedEnable {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.callRel32()
 		} else {
 			e.callRel16()
 		}
 	case 0xE9:
 		e.jmpRel32()
+	case 0xEA:
+		e.farJmp()
 	case 0xEC:
 		e.inAlDx()
 	case 0xEE:
@@ -428,7 +439,8 @@ func (e *Emulator) movSregRm16() {
 	e.eip++
 	m := e.parseModRM()
 	rm16 := e.getRm16(m)
-	e.setSreg16(m, rm16)
+	// fmt.Printf("m.opecode=%d\n", m.opecode)
+	e.setSreg16(m.opecode, rm16)
 }
 
 func (e *Emulator) movR8Rm8() {
@@ -513,6 +525,13 @@ func (e *Emulator) shortJmp() {
 	} else {
 		e.eip = e.eip + uint32(diff) + uint32(2)
 	}
+}
+
+func (e *Emulator) farJmp() {
+	offset := e.getCode16(1)
+	segmentIndex := e.getCode16(3)
+	e.setSreg16(CS, segmentIndex)
+	e.eip = uint32(offset)
 }
 
 func (e *Emulator) jmpRel32() {
@@ -729,8 +748,8 @@ func (e *Emulator) setR32(m ModRM, value uint32) {
 	e.setRegister32(m.opecode, value)
 }
 
-func (e *Emulator) setSreg16(m ModRM, value uint16) {
-	e.sreg[m.opecode] = uint32(value)
+func (e *Emulator) setSreg16(index uint8, value uint16) {
+	e.sreg[index] = uint32(value)
 	if e.cr[0]&1 == 0x1 {
 		e.genuineProtectedEnable = true
 	} else {
@@ -869,6 +888,7 @@ func (e *Emulator) setMemory32(address, value uint32) {
 	}
 }
 
+// TODO: consider linear address transformation using DS
 func (e *Emulator) getMemory8(address uint32) uint8 {
 	return e.memory[address]
 }
@@ -972,6 +992,7 @@ func (e *Emulator) dump() {
 
 // get from eip
 
+// TODO: consider linear address transformation using CS
 func (e *Emulator) getCode8(index int32) uint8 {
 	var addr uint32
 	if index < 0 {

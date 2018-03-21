@@ -31,3 +31,7 @@ $ CGO_ENABLED=1 CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc GOOS=window
   - PBR（Partition Boot Record）：フロッピーやUSBメモリなど1パーティションしか持たないもの。OSとフォーマットに依存したローダプログラムを書く必要がある。PBRの512バイトに収めるの困難な場合には、2段のロード方式（多段ブート）を行う。例えば、Windows NT系で使われていたNTLDRは2段。
   - MBR（Master Boot Record）：複数のパーティションをもつHDDなど。先頭446Bは機械語を下記、その後16B x 4パーティション = 64Bに、パーティションテーブルを書く。パーティションテーブルのエントリには、CHS方式あるいはLBA方式でパーティションの開始セクタ（PBR）を指示する。LBA方式はいずれのトラックにおいてもセクタ数が同じとう制約があるので、現在ではふつうLBAで位置決めをする。こちらは、OSやフォーマット形式に依存しない汎用的なもので、起動フラグが0x80であるパーティションを探してそのパーティションの先頭セクタを0x7c00に読み込んでジャンプするだけで良い。ここで、MBR自身も0x7c00にあるのでは？
   - PBRかMBRの判定プログラムなどを実際に組んで、さらに中身を解析すると面白そう。
+- Unix/Linuxでは、論理アドレス、仮想アドレス、リニアアドレスが等価。Segmentは実際には使っていない。
+- `EIP=0x00007c2c (opecode=ea, EA317C0800 jmp 0x8:0x7c31)`の次の命令`EIP=0x00007c31 (opecode=66, 66B810008ED8 mov eax,0xd88e0010)`からは、32bit protected mode で動作が始まる。
+
+![](https://image.slidesharecdn.com/linuxintroduction-130907015640-/95/linux-introduction-29-638.jpg)

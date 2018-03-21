@@ -13,6 +13,8 @@ tiny_x86_emu
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+disasm16.txt
+disasm32.txt
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
