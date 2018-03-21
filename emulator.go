@@ -107,8 +107,18 @@ func (e *Emulator) execInst() error {
 	switch e.getCode8(0) {
 	case 0x01:
 		e.addRm32R32()
+	case 0x03:
+		e.addR32Rm32()
 	case 0x0F:
 		e.code0f()
+	case 0x25:
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+			e.andEaxImm32()
+		} else {
+			e.andAxImm16()
+		}
+	case 0x29:
+		e.subRm32R32()
 	case 0x31:
 		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.xorRm32R32()
@@ -132,6 +142,12 @@ func (e *Emulator) execInst() error {
 		e.eip++
 		e.execInst()
 		e.operandSizeOverride = false
+	case 0x68:
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+			e.pushImm32()
+		} else {
+			e.pushImm16()
+		}
 	case 0x6a:
 		e.pushImm8()
 	case 0x74:
@@ -419,12 +435,28 @@ func (e *Emulator) movRm32R32() {
 	e.setRm32(m, r32)
 }
 
+func (e *Emulator) subRm32R32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	e.setRm32(m, r32-rm32)
+}
+
 func (e *Emulator) addRm32R32() {
 	e.eip++
 	m := e.parseModRM()
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
 	e.setRm32(m, r32+rm32)
+}
+
+func (e *Emulator) addR32Rm32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	e.setR32(m, r32+rm32)
 }
 
 func (e *Emulator) movR32Rm32() {
@@ -492,6 +524,38 @@ func (e *Emulator) testAxImm16() {
 	e.eflags &= ^CARRY
 	e.eflags &= ^OVERFLOW
 	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eip += 3
+}
+
+func (e *Emulator) andEaxImm32() {
+	ax := e.getRegister32(EAX)
+	value := e.getCode32(1)
+	result := ax & value
+	if result == 0 {
+		e.eflags |= ZERO
+	} else {
+		e.eflags &= ^ZERO
+	}
+	e.eflags &= ^CARRY
+	e.eflags &= ^OVERFLOW
+	e.updateEflagsPf(uint8(result & 0xFF))
+	e.setRegister32(EAX, result)
+	e.eip += 5
+}
+
+func (e *Emulator) andAxImm16() {
+	ax := uint32(e.getRegister16(AX))
+	value := uint32(e.getCode16(1))
+	result := ax & value
+	if result == 0 {
+		e.eflags |= ZERO
+	} else {
+		e.eflags &= ^ZERO
+	}
+	e.eflags &= ^CARRY
+	e.eflags &= ^OVERFLOW
+	e.updateEflagsPf(uint8(result & 0xFF))
+	e.setRegister16(AX, uint16(result))
 	e.eip += 3
 }
 
@@ -571,6 +635,18 @@ func (e *Emulator) pushImm8() {
 	value := uint32(e.getCode8(1))
 	e.push32(value)
 	e.eip += 2
+}
+
+func (e *Emulator) pushImm16() {
+	value := uint32(e.getCode16(1))
+	e.push32(value)
+	e.eip += 3
+}
+
+func (e *Emulator) pushImm32() {
+	value := e.getCode32(1)
+	e.push32(value)
+	e.eip += 5
 }
 
 func (e *Emulator) callRel16() {
