@@ -125,6 +125,8 @@ func (e *Emulator) execInst() error {
 		} else {
 			e.xorRm16R16()
 		}
+	case 0x39:
+		e.cmpRm32R32()
 	case 0x3b:
 		e.cmpR32Rm32()
 	case 0x3c:
@@ -154,6 +156,8 @@ func (e *Emulator) execInst() error {
 		e.jz()
 	case 0x75:
 		e.jnz()
+	case 0x76:
+		e.jna()
 	case 0x78:
 		e.js()
 	case 0x7E:
@@ -168,6 +172,8 @@ func (e *Emulator) execInst() error {
 		e.movR8Rm8()
 	case 0x8B:
 		e.movR32Rm32()
+	case 0x8D:
+		e.leaR32Rm32()
 	case 0xA8:
 		e.testAlImm8()
 	case 0xA9:
@@ -182,6 +188,8 @@ func (e *Emulator) execInst() error {
 		e.movR8Imm8()
 	case 0x90:
 		e.nop()
+	case 0xC1:
+		e.codeC1()
 	case 0xC3:
 		e.ret()
 	case 0xC7:
@@ -394,6 +402,24 @@ func (e *Emulator) code83() {
 	}
 }
 
+func (e *Emulator) codeC1() {
+	e.eip++
+	m := e.parseModRM()
+
+	shrRm32Imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm8 := uint32(e.getCode8(0))
+		e.eip++
+		e.setRm32(m, rm32 >> imm8)
+		// TODO: change elfags
+	}
+
+	switch m.opecode {
+	case 5:
+		shrRm32Imm8(e,m)
+	}
+}
+
 func (e *Emulator) codeFf() {
 	incRm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
@@ -459,6 +485,13 @@ func (e *Emulator) addR32Rm32() {
 	e.setR32(m, r32+rm32)
 }
 
+func (e *Emulator) leaR32Rm32() {
+	e.eip++
+	m := e.parseModRM()
+	// fmt.Printf("r=%d\n", m.opecode)
+	e.setR32(m, e.calcMemoryAddress32(m))
+}
+
 func (e *Emulator) movR32Rm32() {
 	e.eip++
 	m := e.parseModRM()
@@ -495,6 +528,15 @@ func (e *Emulator) cmpR32Rm32() {
 	rm32 := e.getRm32(m)
 	result := uint64(r32) - uint64(rm32)
 	e.updateEflagsSub(r32, rm32, result)
+}
+
+func (e *Emulator) cmpRm32R32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	result := uint64(rm32) - uint64(r32)
+	e.updateEflagsSub(rm32, r32, result)
 }
 
 func (e *Emulator) testEaxImm32() {
@@ -678,6 +720,14 @@ func (e *Emulator) jnz() {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
+	}
+}
+
+func (e *Emulator) jna() {
+	if e.getEflag(CARRY) || e.getEflag(ZERO) {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
+	} else {
+		e.eip += uint32(2)
 	}
 }
 
