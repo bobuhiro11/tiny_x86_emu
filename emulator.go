@@ -164,6 +164,8 @@ func (e *Emulator) execInst() error {
 		e.jng()
 	case 0x7F:
 		e.jg()
+	case 0x81:
+		e.code81()
 	case 0x83:
 		e.code83()
 	case 0x89:
@@ -352,6 +354,32 @@ func (e *Emulator) movRm32Imm32() {
 	e.setRm32(m, value)
 }
 
+func (e *Emulator) code81() {
+	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm32 := e.getCode32(0)
+		e.eip+=4
+		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		result := uint64(rm32) - uint64(imm32)
+		e.setRm32(m, uint32(result))
+	}
+
+	e.eip++
+	m := e.parseModRM()
+	
+	if (e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+		e.genuineProtectedEnable == true && e.operandSizeOverride == true) {
+		panic("16bit mode is not implemented")
+	}
+
+	switch m.opecode {
+	case 7:
+		cmpRm32Imm32(e, m)
+	default:
+		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented")
+	}
+}
+
 func (e *Emulator) code83() {
 	subRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
@@ -366,6 +394,12 @@ func (e *Emulator) code83() {
 		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
 		e.setRm32(m, rm32+imm8)
+	}
+	andRm32Imm8 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm8 := uint32(e.getSignCode8(0))
+		e.eip++
+		e.setRm32(m, rm32 & uint32(imm8))
 	}
 	orRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
@@ -393,6 +427,8 @@ func (e *Emulator) code83() {
 		addRm32Imm8(e, m)
 	case 1:
 		orRm32Imm8(e,m)
+	case 4:
+		andRm32Imm8(e,m)
 	case 5:
 		subRm32Imm8(e, m)
 	case 7:
@@ -464,9 +500,10 @@ func (e *Emulator) movRm32R32() {
 func (e *Emulator) subRm32R32() {
 	e.eip++
 	m := e.parseModRM()
-	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
-	e.setRm32(m, r32-rm32)
+	r32 := e.getR32(m)
+	fmt.Printf("rm32=0x%x r32=0x%x\n",rm32,r32)
+	e.setRm32(m, rm32-r32)
 }
 
 func (e *Emulator) addRm32R32() {
@@ -530,8 +567,7 @@ func (e *Emulator) cmpR32Rm32() {
 	e.updateEflagsSub(r32, rm32, result)
 }
 
-func (e *Emulator) cmpRm32R32() {
-	e.eip++
+func (e *Emulator) cmpRm32R32() { e.eip++
 	m := e.parseModRM()
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
@@ -827,6 +863,7 @@ func (e *Emulator) getRm32(m ModRM) uint32 {
 		return e.getRegister32(m.rm)
 	}
 	address := e.calcMemoryAddress32(m)
+	fmt.Printf("rm32 address=0x%x\n", address)
 	return e.getMemory32(address)
 }
 
@@ -1056,11 +1093,14 @@ func (e *Emulator) pop32() uint32 {
 }
 
 func (e *Emulator) ioIn8(address uint16) uint8 {
+	fmt.Printf("ioIn8 from 0x%x\n", address)
 	switch address {
 	case 0x03f8:
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		return input[0]
+	case 0x01f7:
+		return 0x40 // TODO: check disk ready?
 	default:
 		return 0
 	}

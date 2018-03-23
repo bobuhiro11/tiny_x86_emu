@@ -56,7 +56,7 @@ func main() {
 	}
 	// disasm binary
 	exec.Command("sh", "-c", "head -c 49  " + *filename+ " | ndisasm -b 16 -o 0x7c00 - |  tee disasm16.txt").Run() // 16 bit mode
-	exec.Command("sh", "-c", "tail -c +50 " + *filename+ " | ndisasm -b 32 -o 0x7c31 - | head -n 1000 | tee disasm32.txt").Run() // 32 bit mode
+	exec.Command("sh", "-c", "tail -c +50 " + *filename+ " | ndisasm -b 32 -o 0x7c31 - | head -n 5000 | tee disasm32.txt").Run() // 32 bit mode
 	b, err := exec.Command("sh", "-c", "cat disasm16.txt disasm32.txt").CombinedOutput()
 	disasm := map[uint64]string{}
 	if err != nil {
