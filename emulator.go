@@ -67,13 +67,14 @@ type Emulator struct {
 	isSilent    bool       // silent mode
 	reader      io.Reader
 	writer      io.Writer
+	io			IO
 	operandSizeOverride bool  // true if operand size override (0x66) is enabled
 	genuineProtectedEnable bool // procted mode is refreshed only when sreg is changed
 	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
 // NewEmulator creates New Emulator
-	func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
+func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
 		e := &Emulator{
 		memory:      make([]uint8, memorySize),
 		eip:         eip,
@@ -83,6 +84,7 @@ type Emulator struct {
 		disasm:      disasm,
 	}
 	e.registers[ESP] = esp
+	e.io = NewIO()
 	if protectedMode{
 		e.cr[0] |= 1
 		e.genuineProtectedEnable = true
@@ -225,6 +227,8 @@ func (e *Emulator) execInst() error {
 		e.halt()
 	case 0xFA:
 		e.cli()
+	case 0xFC:
+		e.cld()
 	case 0xFF:
 		e.codeFf()
 	default:
@@ -238,7 +242,12 @@ func (e *Emulator) nop() {
 }
 
 func (e *Emulator) cli() {
-	e.eflags.set(InterruptFlag)
+	e.eflags.unset(InterruptFlag)
+	e.eip++
+}
+
+func (e *Emulator) cld() {
+	e.eflags.unset(DirectionFlag)
 	e.eip++
 }
 
