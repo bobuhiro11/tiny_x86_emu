@@ -9,12 +9,15 @@ type Eflags uint32
 
 // eflags
 const (
-	CARRY    = uint32(1) << 0
-	PF       = uint32(1) << 2
-	ZERO     = uint32(1) << 6
-	SIGN     = uint32(1) << 7
-	IF       = uint32(1) << 9 // interrupt enable flag
-	OVERFLOW = uint32(1) << 11
+	CarryFlag     = uint32(1) << 0
+	ParityFlag    = uint32(1) << 2
+	AdjustFlag    = uint32(1) << 4
+	ZeroFlag      = uint32(1) << 6
+	SignFlag      = uint32(1) << 7
+	TrapFlag      = uint32(1) << 8
+	InterruptFlag = uint32(1) << 9
+	DirectionFlag = uint32(1) << 10
+	OverflowFlag  = uint32(1) << 11
 )
 
 func (ef *Eflags) setVal(flag uint32, value bool) {
@@ -42,17 +45,13 @@ func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 	sign2 := (v2 >> 31) & 0x01
 	signr := uint32((result >> 31) & 0x01)
 
-	ef.setVal(CARRY, result>>32 != 0)
-	ef.setVal(ZERO, result == 0)
-	ef.setVal(SIGN, signr != 0)
-	ef.setVal(OVERFLOW, sign1 != sign2 && sign1 != signr)
+	ef.setVal(CarryFlag, result>>32 != 0)
+	ef.setVal(ZeroFlag, result == 0)
+	ef.setVal(SignFlag, signr != 0)
+	ef.setVal(OverflowFlag, sign1 != sign2 && sign1 != signr)
 }
 
 func (ef *Eflags) updatePF(result uint8) {
 	popcnt := bits.OnesCount8(result)
-	if popcnt%2 == 0 {
-		ef.set(PF)
-	} else {
-		ef.unset(PF)
-	}
+	ef.setVal(ParityFlag, popcnt%2 == 0)
 }

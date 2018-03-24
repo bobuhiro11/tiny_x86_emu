@@ -238,7 +238,7 @@ func (e *Emulator) nop() {
 }
 
 func (e *Emulator) cli() {
-	e.eflags.set(IF)
+	e.eflags.set(InterruptFlag)
 	e.eip++
 }
 
@@ -569,12 +569,12 @@ func (e *Emulator) testEaxImm32() {
 	value := e.getCode32(1)
 	result := ax & value
 	if result == 0 {
-		e.eflags.set(ZERO)
+		e.eflags.set(ZeroFlag)
 	} else {
-		e.eflags.unset(ZERO)
+		e.eflags.unset(ZeroFlag)
 	}
-	e.eflags.unset(CARRY)
-	e.eflags.unset(OVERFLOW)
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 5
 }
@@ -584,12 +584,12 @@ func (e *Emulator) testAxImm16() {
 	value := uint32(e.getCode16(1))
 	result := ax & value
 	if result == 0 {
-		e.eflags.set(ZERO)
+		e.eflags.set(ZeroFlag)
 	} else {
-		e.eflags.unset(ZERO)
+		e.eflags.unset(ZeroFlag)
 	}
-	e.eflags.unset(CARRY)
-	e.eflags.unset(OVERFLOW)
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 3
 }
@@ -599,12 +599,12 @@ func (e *Emulator) andEaxImm32() {
 	value := e.getCode32(1)
 	result := ax & value
 	if result == 0 {
-		e.eflags.set(ZERO)
+		e.eflags.set(ZeroFlag)
 	} else {
-		e.eflags.unset(ZERO)
+		e.eflags.unset(ZeroFlag)
 	}
-	e.eflags.unset(CARRY)
-	e.eflags.unset(OVERFLOW)
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.setRegister32(EAX, result)
 	e.eip += 5
@@ -615,12 +615,12 @@ func (e *Emulator) andAxImm16() {
 	value := uint32(e.getCode16(1))
 	result := ax & value
 	if result == 0 {
-		e.eflags.set(ZERO)
+		e.eflags.set(ZeroFlag)
 	} else {
-		e.eflags.unset(ZERO)
+		e.eflags.unset(ZeroFlag)
 	}
-	e.eflags.unset(CARRY)
-	e.eflags.unset(OVERFLOW)
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.setRegister16(AX, uint16(result))
 	e.eip += 3
@@ -631,12 +631,12 @@ func (e *Emulator) testAlImm8() {
 	value := uint32(e.getCode8(1))
 	result := al & value
 	if result == 0 {
-		e.eflags.set(ZERO)
+		e.eflags.set(ZeroFlag)
 	} else {
-		e.eflags.unset(ZERO)
+		e.eflags.unset(ZeroFlag)
 	}
-	e.eflags.unset(CARRY)
-	e.eflags.unset(OVERFLOW)
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 2
 }
@@ -741,7 +741,7 @@ func (e *Emulator) ret() {
 }
 
 func (e *Emulator) jnz() {
-	if e.eflags.isEnable(ZERO) {
+	if e.eflags.isEnable(ZeroFlag) {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
@@ -749,7 +749,7 @@ func (e *Emulator) jnz() {
 }
 
 func (e *Emulator) jna() {
-	if e.eflags.isEnable(CARRY) || e.eflags.isEnable(ZERO) {
+	if e.eflags.isEnable(CarryFlag) || e.eflags.isEnable(ZeroFlag) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -757,7 +757,7 @@ func (e *Emulator) jna() {
 }
 
 func (e *Emulator) jz() {
-	if e.eflags.isEnable(ZERO) {
+	if e.eflags.isEnable(ZeroFlag) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -765,7 +765,7 @@ func (e *Emulator) jz() {
 }
 
 func (e *Emulator) js() {
-	if e.eflags.isEnable(SIGN) {
+	if e.eflags.isEnable(SignFlag) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -773,7 +773,7 @@ func (e *Emulator) js() {
 }
 
 func (e *Emulator) jns() {
-	if e.eflags.isEnable(SIGN) {
+	if e.eflags.isEnable(SignFlag) {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
@@ -781,7 +781,7 @@ func (e *Emulator) jns() {
 }
 
 func (e *Emulator) jg() {
-	if e.eflags.isEnable(ZERO) && e.eflags.isEnable(SIGN) == e.eflags.isEnable(OVERFLOW) {
+	if e.eflags.isEnable(ZeroFlag) && e.eflags.isEnable(SignFlag) == e.eflags.isEnable(OverflowFlag) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -789,7 +789,7 @@ func (e *Emulator) jg() {
 }
 
 func (e *Emulator) jng() {
-	if e.eflags.isEnable(ZERO) || e.eflags.isEnable(SIGN) != e.eflags.isEnable(OVERFLOW) {
+	if e.eflags.isEnable(ZeroFlag) || e.eflags.isEnable(SignFlag) != e.eflags.isEnable(OverflowFlag) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -797,7 +797,7 @@ func (e *Emulator) jng() {
 }
 
 func (e *Emulator) jl() {
-	if e.eflags.isEnable(SIGN) != e.eflags.isEnable(OVERFLOW) {
+	if e.eflags.isEnable(SignFlag) != e.eflags.isEnable(OverflowFlag) {
 		e.eip += uint32(e.getSignCode8(1))
 	} else {
 		e.eip += 2
@@ -805,7 +805,7 @@ func (e *Emulator) jl() {
 }
 
 func (e *Emulator) jle() {
-	if e.eflags.isEnable(ZERO) || e.eflags.isEnable(SIGN) != e.eflags.isEnable(OVERFLOW) {
+	if e.eflags.isEnable(ZeroFlag) || e.eflags.isEnable(SignFlag) != e.eflags.isEnable(OverflowFlag) {
 		e.eip += uint32(e.getSignCode8(1))
 	} else {
 		e.eip += 2
