@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"io"
-	"math/bits"
 	"os"
 )
 
@@ -55,22 +54,12 @@ const (
 	GS=5
 )
 
-// eflags
-const (
-	CARRY    = uint32(1) << 0
-	PF       = uint32(1) << 2
-	ZERO     = uint32(1) << 6
-	SIGN     = uint32(1) << 7
-	IF       = uint32(1) << 9 // interrupt enable flag
-	OVERFLOW = uint32(1) << 11
-)
-
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
 	registers   [8]uint32  // general registers
 	cr          [16]uint32 // controll registers
 	sreg        [6]uint32  // segment registers
-	eflags      uint32     // eflags
+	eflags      Eflags     // eflags
 	gdtrSize	uint16     // global table descriptor table's size
 	gdtrBase	uint32     // global table descriptor table's base phys address
 	memory      []uint8    // physical memory
@@ -249,7 +238,7 @@ func (e *Emulator) nop() {
 }
 
 func (e *Emulator) cli() {
-	e.eflags |= IF
+	e.eflags.set(IF)
 	e.eip++
 }
 
@@ -387,7 +376,7 @@ func (e *Emulator) code83() {
 		e.eip++
 		result := uint64(rm32) - uint64(imm8)
 		e.setRm32(m, uint32(result))
-		e.updateEflagsSub(rm32, imm8, result)
+		e.eflags.updateBySub(rm32, imm8, result)
 	}
 	addRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
@@ -412,7 +401,7 @@ func (e *Emulator) code83() {
 		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
 		result := uint64(rm32) - uint64(imm8)
-		e.updateEflagsSub(rm32, imm8, result)
+		e.eflags.updateBySub(rm32, imm8, result)
 	}
 	e.eip++
 	m := e.parseModRM()
@@ -564,7 +553,7 @@ func (e *Emulator) cmpR32Rm32() {
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
 	result := uint64(r32) - uint64(rm32)
-	e.updateEflagsSub(r32, rm32, result)
+	e.eflags.updateBySub(r32, rm32, result)
 }
 
 func (e *Emulator) cmpRm32R32() { e.eip++
@@ -572,7 +561,7 @@ func (e *Emulator) cmpRm32R32() { e.eip++
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
 	result := uint64(rm32) - uint64(r32)
-	e.updateEflagsSub(rm32, r32, result)
+	e.eflags.updateBySub(rm32, r32, result)
 }
 
 func (e *Emulator) testEaxImm32() {
@@ -580,13 +569,13 @@ func (e *Emulator) testEaxImm32() {
 	value := e.getCode32(1)
 	result := ax & value
 	if result == 0 {
-		e.eflags |= ZERO
+		e.eflags.set(ZERO)
 	} else {
-		e.eflags &= ^ZERO
+		e.eflags.unset(ZERO)
 	}
-	e.eflags &= ^CARRY
-	e.eflags &= ^OVERFLOW
-	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eflags.unset(CARRY)
+	e.eflags.unset(OVERFLOW)
+	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 5
 }
 
@@ -595,13 +584,13 @@ func (e *Emulator) testAxImm16() {
 	value := uint32(e.getCode16(1))
 	result := ax & value
 	if result == 0 {
-		e.eflags |= ZERO
+		e.eflags.set(ZERO)
 	} else {
-		e.eflags &= ^ZERO
+		e.eflags.unset(ZERO)
 	}
-	e.eflags &= ^CARRY
-	e.eflags &= ^OVERFLOW
-	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eflags.unset(CARRY)
+	e.eflags.unset(OVERFLOW)
+	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 3
 }
 
@@ -610,13 +599,13 @@ func (e *Emulator) andEaxImm32() {
 	value := e.getCode32(1)
 	result := ax & value
 	if result == 0 {
-		e.eflags |= ZERO
+		e.eflags.set(ZERO)
 	} else {
-		e.eflags &= ^ZERO
+		e.eflags.unset(ZERO)
 	}
-	e.eflags &= ^CARRY
-	e.eflags &= ^OVERFLOW
-	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eflags.unset(CARRY)
+	e.eflags.unset(OVERFLOW)
+	e.eflags.updatePF(uint8(result & 0xFF))
 	e.setRegister32(EAX, result)
 	e.eip += 5
 }
@@ -626,13 +615,13 @@ func (e *Emulator) andAxImm16() {
 	value := uint32(e.getCode16(1))
 	result := ax & value
 	if result == 0 {
-		e.eflags |= ZERO
+		e.eflags.set(ZERO)
 	} else {
-		e.eflags &= ^ZERO
+		e.eflags.unset(ZERO)
 	}
-	e.eflags &= ^CARRY
-	e.eflags &= ^OVERFLOW
-	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eflags.unset(CARRY)
+	e.eflags.unset(OVERFLOW)
+	e.eflags.updatePF(uint8(result & 0xFF))
 	e.setRegister16(AX, uint16(result))
 	e.eip += 3
 }
@@ -642,13 +631,13 @@ func (e *Emulator) testAlImm8() {
 	value := uint32(e.getCode8(1))
 	result := al & value
 	if result == 0 {
-		e.eflags |= ZERO
+		e.eflags.set(ZERO)
 	} else {
-		e.eflags &= ^ZERO
+		e.eflags.unset(ZERO)
 	}
-	e.eflags &= ^CARRY
-	e.eflags &= ^OVERFLOW
-	e.updateEflagsPf(uint8(result & 0xFF))
+	e.eflags.unset(CARRY)
+	e.eflags.unset(OVERFLOW)
+	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 2
 }
 
@@ -656,7 +645,7 @@ func (e *Emulator) cmpAlImm8() {
 	al := uint32(e.getRegister8(AL))
 	value := uint32(e.getCode8(1))
 	result := uint64(al) - uint64(value)
-	e.updateEflagsSub(al, value, result)
+	e.eflags.updateBySub(al, value, result)
 	e.eip += 2
 }
 
@@ -752,7 +741,7 @@ func (e *Emulator) ret() {
 }
 
 func (e *Emulator) jnz() {
-	if e.getEflag(ZERO) {
+	if e.eflags.isEnable(ZERO) {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
@@ -760,7 +749,7 @@ func (e *Emulator) jnz() {
 }
 
 func (e *Emulator) jna() {
-	if e.getEflag(CARRY) || e.getEflag(ZERO) {
+	if e.eflags.isEnable(CARRY) || e.eflags.isEnable(ZERO) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -768,7 +757,7 @@ func (e *Emulator) jna() {
 }
 
 func (e *Emulator) jz() {
-	if e.getEflag(ZERO) {
+	if e.eflags.isEnable(ZERO) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -776,7 +765,7 @@ func (e *Emulator) jz() {
 }
 
 func (e *Emulator) js() {
-	if e.getEflag(SIGN) {
+	if e.eflags.isEnable(SIGN) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -784,7 +773,7 @@ func (e *Emulator) js() {
 }
 
 func (e *Emulator) jns() {
-	if e.getEflag(SIGN) {
+	if e.eflags.isEnable(SIGN) {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
@@ -792,7 +781,7 @@ func (e *Emulator) jns() {
 }
 
 func (e *Emulator) jg() {
-	if e.getEflag(ZERO) && e.getEflag(SIGN) == e.getEflag(OVERFLOW) {
+	if e.eflags.isEnable(ZERO) && e.eflags.isEnable(SIGN) == e.eflags.isEnable(OVERFLOW) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -800,7 +789,7 @@ func (e *Emulator) jg() {
 }
 
 func (e *Emulator) jng() {
-	if e.getEflag(ZERO) || e.getEflag(SIGN) != e.getEflag(OVERFLOW) {
+	if e.eflags.isEnable(ZERO) || e.eflags.isEnable(SIGN) != e.eflags.isEnable(OVERFLOW) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
@@ -808,7 +797,7 @@ func (e *Emulator) jng() {
 }
 
 func (e *Emulator) jl() {
-	if e.getEflag(SIGN) != e.getEflag(OVERFLOW) {
+	if e.eflags.isEnable(SIGN) != e.eflags.isEnable(OVERFLOW) {
 		e.eip += uint32(e.getSignCode8(1))
 	} else {
 		e.eip += 2
@@ -816,7 +805,7 @@ func (e *Emulator) jl() {
 }
 
 func (e *Emulator) jle() {
-	if e.getEflag(ZERO) || e.getEflag(SIGN) != e.getEflag(OVERFLOW) {
+	if e.eflags.isEnable(ZERO) || e.eflags.isEnable(SIGN) != e.eflags.isEnable(OVERFLOW) {
 		e.eip += uint32(e.getSignCode8(1))
 	} else {
 		e.eip += 2
@@ -1111,6 +1100,7 @@ func (e *Emulator) ioOut8(address uint16, value uint8) {
 	case 0x03f8:
 		fmt.Fprint(e.writer, string(value))
 	default:
+		fmt.Printf("ioOut8 address=0x%x value=0x%x\n", address, value)
 		return
 	}
 }
@@ -1203,38 +1193,6 @@ func (e *Emulator) getSingedCode32(index int32) int32 {
 
 func (e *Emulator) getSingedCode16(index int32) int16 {
 	return int16(e.getCode16(index))
-}
-
-func (e *Emulator) updateEflagsPf(result uint8) {
-	popcnt := bits.OnesCount8(result)
-	if popcnt%2 == 0 {
-		e.eflags |= PF
-	} else {
-		e.eflags &= ^PF
-	}
-}
-
-func (e *Emulator) updateEflagsSub(v1, v2 uint32, result uint64) {
-	sign1 := (v1 >> 31) & 0x01
-	sign2 := (v2 >> 31) & 0x01
-	signr := uint32((result >> 31) & 0x01)
-
-	e.setEflag(CARRY, result>>32 != 0)
-	e.setEflag(ZERO, result == 0)
-	e.setEflag(SIGN, signr != 0)
-	e.setEflag(OVERFLOW, sign1 != sign2 && sign1 != signr)
-}
-
-func (e *Emulator) setEflag(flag uint32, cond bool) {
-	if cond {
-		e.eflags |= flag
-	} else {
-		e.eflags &= ^flag
-	}
-}
-
-func (e *Emulator) getEflag(flag uint32) bool {
-	return e.eflags&flag != 0
 }
 
 // ModRM parameter
