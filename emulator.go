@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"github.com/fatih/color"
 	"io"
-	"os"
 )
 
 // 32bit registers
@@ -84,7 +82,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 		disasm:      disasm,
 	}
 	e.registers[ESP] = esp
-	e.io = NewIO()
+	e.io = NewIO(&reader, &writer)
 	if protectedMode{
 		e.cr[0] |= 1
 		e.genuineProtectedEnable = true
@@ -299,27 +297,17 @@ func (e *Emulator) intImm8() {
 }
 
 func (e *Emulator) outAlImm8() {
-	ioAddress := e.getCode8(1)
-	e.getRegister16(AL)
-	if ioAddress == 0x60 {
-		// keyboard input register
-		e.eip += 2
-	} else if ioAddress == 0x64 {
-		// keyboard command register
-		e.eip += 2
-	} else {
-		panic(fmt.Sprintf("inAlImm8 not implemented"))
-	}
+	address := uint16(e.getCode8(1))
+	value := e.getRegister8(AL)
+	e.io.out8(address, value)
+	e.eip+=2
 }
 
 func (e *Emulator) inAlImm8() {
-	ioAddress := e.getCode8(1)
-	if ioAddress == 0x64 {
-		e.setRegister8(AL, 0x0) // keyboard status register. 0x0 means not busy.
-		e.eip += 2
-	} else {
-		panic(fmt.Sprintf("inAlImm8 not implemented"))
-	}
+	address := uint16(e.getCode8(1))
+	value := e.io.in8(address)
+	e.setRegister8(AL, value)
+	e.eip += 2
 }
 
 func (e *Emulator) inAxImm8() {
@@ -822,16 +810,16 @@ func (e *Emulator) jle() {
 }
 
 func (e *Emulator) inAlDx() {
-	address := uint16(e.getRegister32(EDX) & 0xffff)
-	value := e.ioIn8(address)
+	address := e.getRegister16(DX)
+	value := e.io.in8(address)
 	e.setRegister8(AL, value)
 	e.eip++
 }
 
 func (e *Emulator) outAlDx() {
-	address := uint16(e.getRegister32(EDX) & 0xffff)
+	address := e.getRegister16(DX)
 	value := e.getRegister8(AL)
-	e.ioOut8(address, value)
+	e.io.out8(address, value)
 	e.eip++
 }
 
@@ -1088,30 +1076,6 @@ func (e *Emulator) pop32() uint32 {
 	value := e.getMemory32(e.getRegister32(ESP))
 	e.incRegister32(ESP, 4)
 	return value
-}
-
-func (e *Emulator) ioIn8(address uint16) uint8 {
-	fmt.Printf("ioIn8 from 0x%x\n", address)
-	switch address {
-	case 0x03f8:
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		return input[0]
-	case 0x01f7:
-		return 0x40 // TODO: check disk ready?
-	default:
-		return 0
-	}
-}
-
-func (e *Emulator) ioOut8(address uint16, value uint8) {
-	switch address {
-	case 0x03f8:
-		fmt.Fprint(e.writer, string(value))
-	default:
-		fmt.Printf("ioOut8 address=0x%x value=0x%x\n", address, value)
-		return
-	}
 }
 
 func (e *Emulator) halt() {
