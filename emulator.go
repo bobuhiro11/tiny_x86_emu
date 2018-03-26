@@ -141,6 +141,8 @@ func (e *Emulator) execInst() error {
 		}
 	case 0x6a:
 		e.pushImm8()
+	case 0x6d:
+		e.insd()
 	case 0x74:
 		e.jz()
 	case 0x75:
@@ -221,6 +223,15 @@ func (e *Emulator) execInst() error {
 		e.inAlDx()
 	case 0xEE:
 		e.outAlDx()
+	case 0xF3:
+		// rep prefix
+		fmt.Printf("repeat %d times.\n", e.getRegister32(ECX))
+		eip := e.eip + 1
+		for e.getRegister32(ECX) > 1 {
+			e.eip = eip
+			e.execInst()
+			e.decRegister32(ECX, 1)
+		}
 	case 0xF4:
 		e.halt()
 	case 0xFA:
@@ -236,6 +247,17 @@ func (e *Emulator) execInst() error {
 }
 
 func (e *Emulator) nop() {
+	e.eip++
+}
+
+func (e *Emulator) insd() {
+	ioAddress := e.getRegister16(DX)
+	value := e.io.in32(ioAddress)
+	memAddress := e.getRegister32(EDI)
+	e.setMemory32(memAddress, value)
+	e.incRegister32(EDI, 4)
+	fmt.Printf("input 0x%x from io[0x%x] to memory[0x%x]\n",
+		value, ioAddress, memAddress)
 	e.eip++
 }
 

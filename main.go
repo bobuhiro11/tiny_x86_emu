@@ -85,6 +85,7 @@ func main() {
 	for i := 0; i < len(bytes); i++ {
 		e.memory[i+0x7c00] = bytes[i]
 	}
+	e.io.hdds[0],_ = os.Open(*filename)
 
 	// emulate
 	chFinished := make(chan bool)
