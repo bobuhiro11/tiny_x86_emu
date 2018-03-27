@@ -149,6 +149,8 @@ func (e *Emulator) execInst() error {
 		e.jnz()
 	case 0x76:
 		e.jna()
+	case 0x77:
+		e.ja()
 	case 0x78:
 		e.js()
 	case 0x7E:
@@ -363,6 +365,14 @@ func (e *Emulator) movRm32Imm32() {
 }
 
 func (e *Emulator) code81() {
+	addRm32Imm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm32 := e.getCode32(0)
+		e.eip+=4
+		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+	result := uint64(rm32) + uint64(imm32)
+		e.setRm32(m, uint32(result))
+	}
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
@@ -381,6 +391,8 @@ func (e *Emulator) code81() {
 	}
 
 	switch m.opecode {
+	case 0:
+		addRm32Imm32(e, m)
 	case 7:
 		cmpRm32Imm32(e, m)
 	default:
@@ -761,6 +773,14 @@ func (e *Emulator) ret() {
 
 func (e *Emulator) jnz() {
 	if e.eflags.isEnable(ZeroFlag) {
+		e.eip += uint32(2)
+	} else {
+		e.eip += uint32(2) + uint32(e.getSignCode8(1))
+	}
+}
+
+func (e *Emulator) ja() {
+	if e.eflags.isEnable(CarryFlag) || e.eflags.isEnable(ZeroFlag) {
 		e.eip += uint32(2)
 	} else {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
