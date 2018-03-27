@@ -7,6 +7,11 @@ import (
 	"io"
 )
 
+const (
+	// SectorSize is 512 Byte
+	SectorSize = 512
+)
+
 // IO has I/O port and emulate I/O device
 type IO struct {
 	memory [65536]uint8 // I/O port
@@ -24,11 +29,14 @@ func NewIO(reader *io.Reader, writer *io.Writer) IO{
 }
 
 func (io *IO) in8(address uint16) uint8 {
-	fmt.Printf("io.in8 from 0x%x\n", address)
+	// fmt.Printf("io.in8 from 0x%x\n", address)
 	switch address {
 	case 0x0064: // Keyboard Controller Read Status
 		io.memory[address] = 0
 	case 0x01f0: // Data Register (Read sector 32bit-chunk, 128 times)
+		b := make([]byte, 1)
+		io.hdds[0].Read(b)
+		io.memory[address] = b[0]
 	case 0x01f7: // 1st Hark Disk Status (4th bit means drive ready)
 		io.memory[address] = 0x40
 	case 0x03f8: // Reciever Buffer Register
@@ -55,16 +63,21 @@ func (io *IO) out8(address uint16, value uint8){
 		fmt.Printf("Secter Count=%d\n", io.memory[address])
 		return
 	case 0x01f3: // Secter Number
-		fmt.Printf("Secter Number=%d\n", io.memory[address])
+		io.hdds[0].Seek(0, 0) // Read a entire sector (TODO: check)
+		offset, _ := io.hdds[0].Seek(int64(value) * SectorSize, 1)
+		fmt.Printf("Secter Number=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f4: // Cylinder low
-		fmt.Printf("Sylinder Low=%d\n", io.memory[address])
+		offset, _ := io.hdds[0].Seek(int64(value << 8) * SectorSize, 1)
+		fmt.Printf("Sylinder Low=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f5: // Cylinder High
-		fmt.Printf("Sylinder High=%d\n", io.memory[address])
+		offset, _ := io.hdds[0].Seek(int64(value << 16) * SectorSize, 1)
+		fmt.Printf("Sylinder High=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f6: // Drive/Head
-		fmt.Printf("Drive Number=%d\n", (io.memory[address]&0x8) >> 4)
+		offset, _ := io.hdds[0].Seek(int64(value << 24) * SectorSize, 1)
+		fmt.Printf("Drive Number=%d offset=%d\n", (io.memory[address]&0x8) >> 4, offset)
 		return
 	case 0x01f7: // Command Register
 		fmt.Printf("Command Register=%d\n", io.memory[address])

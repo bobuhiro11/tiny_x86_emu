@@ -256,7 +256,7 @@ func (e *Emulator) insd() {
 	memAddress := e.getRegister32(EDI)
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
-	fmt.Printf("input 0x%x from io[0x%x] to memory[0x%x]\n",
+	fmt.Printf("input 0x%08x from io[0x%x] to memory[0x%x]\n",
 		value, ioAddress, memAddress)
 	e.eip++
 }
