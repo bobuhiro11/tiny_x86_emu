@@ -481,13 +481,33 @@ func (e *Emulator) codeFf() {
 		rm32 := e.getRm32(m)
 		e.setRm32(m, rm32+1)
 	}
+	decRm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		e.setRm32(m, rm32-1)
+	}
+	pushRm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		e.push32(rm32)
+	}
 	e.eip++
 	m := e.parseModRM()
 	switch m.opecode {
 	case 0:
 		incRm32(e, m)
+	case 1:
+		decRm32(e, m)
+	// case 2:
+	// 	callRm32(e, m)
+	// case 3:
+	// 	callM16(e, m)
+	// case 4:
+	// 	jmpRm32(e, m)
+	// case 5:
+	// 	jmpM16(e, m)
+	case 6:
+		pushRm32(e, m)
 	default:
-		panic("not implemented")
+		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented at codeFf")
 	}
 }
 
