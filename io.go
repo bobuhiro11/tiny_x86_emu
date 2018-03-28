@@ -76,7 +76,7 @@ func (io *IO) out8(address uint16, value uint8){
 		fmt.Printf("Sylinder High=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f6: // Drive/Head
-		offset, _ := io.hdds[0].Seek(int64(uint32(value) << 24) * SectorSize, 1)
+		offset, _ := io.hdds[0].Seek(int64((uint32(value)&0x1F) << 24) * SectorSize, 1)
 		fmt.Printf("Drive Number=%d offset=%d\n", (io.memory[address]&0x8) >> 4, offset)
 		return
 	case 0x01f7: // Command Register

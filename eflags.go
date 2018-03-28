@@ -45,7 +45,7 @@ func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 	sign2 := (v2 >> 31) & 0x01
 	signr := uint32((result >> 31) & 0x01)
 
-	ef.setVal(CarryFlag, result>>32 != 0)
+	ef.setVal(CarryFlag, (result>>32) != 0)
 	ef.setVal(ZeroFlag, result == 0)
 	ef.setVal(SignFlag, signr != 0)
 	ef.setVal(OverflowFlag, sign1 != sign2 && sign1 != signr)
