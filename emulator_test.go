@@ -107,8 +107,11 @@ func run(t *testing.T, filename string, protectedEnable bool) (*Emulator, string
 	reader := &bytes.Buffer{}
 	writer := &bytes.Buffer{}
 	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, protectedEnable, true, reader, writer, map[uint64]string{})
+	// for i := uint32(0); i < 0x7c00 + 0x10000; i++ {
+	// 	e.memory[i] = 0
+	// }
 	for i := 0; i < len(bin); i++ {
-		e.memory[i+0x7c00] = bin[i]
+		e.memory[uint32(i+0x7c00)] = bin[i]
 	}
 	for e.eip < 0x7c00+0x10000 {
 		err := e.execInst()

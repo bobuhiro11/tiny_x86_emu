@@ -83,7 +83,7 @@ func main() {
 	// setup emulator
 	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x8000, false, *silent, os.Stdin, os.Stdout, disasm)
 	for i := 0; i < len(bytes); i++ {
-		e.memory[i+0x7c00] = bytes[i]
+		e.memory[uint32(i+0x7c00)] = bytes[i]
 	}
 	e.io.hdds[0],_ = os.Open(*filename)
 
@@ -91,7 +91,7 @@ func main() {
 	chFinished := make(chan bool)
 	go func(chFinished chan bool) {
 		// time.Sleep(3000 * time.Millisecond)
-		for e.eip < 0x7c00+0x10000 {
+		for e.eip < 0x7c00+0x200000 {
 			if !*silent {
 				e.dump()
 			}

@@ -60,7 +60,7 @@ type Emulator struct {
 	eflags      Eflags     // eflags
 	gdtrSize	uint16     // global table descriptor table's size
 	gdtrBase	uint32     // global table descriptor table's base phys address
-	memory      []uint8    // physical memory
+	memory      map[uint32]uint8    // physical memory
 	eip         uint32     // program counter
 	isSilent    bool       // silent mode
 	reader      io.Reader
@@ -74,7 +74,8 @@ type Emulator struct {
 // NewEmulator creates New Emulator
 func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
 		e := &Emulator{
-		memory:      make([]uint8, memorySize),
+		// memory:      make([]uint8, memorySize * 2),
+		memory:      map[uint32]uint8{},
 		eip:         eip,
 		isSilent:    isSilent,
 		reader:      reader,
@@ -201,6 +202,8 @@ func (e *Emulator) execInst() error {
 		e.movR8Imm8()
 	case 0x90:
 		e.nop()
+	case 0xAA:
+		e.stosb()
 	case 0xC1:
 		e.codeC1()
 	case 0xC3:
@@ -270,11 +273,23 @@ func (e *Emulator) nop() {
 	e.eip++
 }
 
+func (e *Emulator) stosb() {
+	address := e.getRegister32(EDI)
+	value := e.getRegister8(AL)
+	e.setMemory8(address, value)
+	if e.eflags.isEnable(DirectionFlag) {
+		e.decRegister32(EDI, 1)
+	} else {
+		e.incRegister32(EDI, 1)
+	}
+	e.eip++
+}
+
 func (e *Emulator) insd() {
 	ioAddress := e.getRegister16(DX)
 	value := e.io.in32(ioAddress)
 	memAddress := e.getRegister32(EDI)
-	fmt.Printf("input 0x%08x from io[0x%x] to memory[0x%x]\n",
+	fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[0x%x]\n",
 		value, ioAddress, memAddress)
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
