@@ -99,6 +99,8 @@ func (e *Emulator) execInst() error {
 		e.addRm32R32()
 	case 0x03:
 		e.addR32Rm32()
+	case 0x0D:
+		e.orEaxImm32()
 	case 0x0F:
 		e.code0f()
 	case 0x25:
@@ -416,6 +418,12 @@ func (e *Emulator) movRm32Imm32() {
 	value := e.getCode32(0)
 	e.eip += 4
 	e.setRm32(m, value)
+}
+
+func (e *Emulator) orEaxImm32() {
+	value := e.getCode32(1)
+	e.setRegister32(EAX, value)
+	e.eip += 5
 }
 
 func (e *Emulator) code81() {
@@ -1298,7 +1306,7 @@ func (e *Emulator) dump() {
 		e.registers[EBP],
 		e.eip,
 	)
-	color.New(color.FgGreen).Printf("(opecode=%x, %s)\n",
+	color.New(color.FgGreen).Printf("(opecode=%02x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
 	color.New(color.FgCyan).Printf("EFLAGS=0x%08x\n", e.eflags)
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/hex"
+	// "encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/hajimehoshi/ebiten"
@@ -70,6 +70,22 @@ func main() {
 		ix, _ := strconv.ParseUint(row[0][2:], 16, 64)
 		disasm[ix] = strings.Join(row[1:], " ")
 	}
+	// disasm binary of ./xv6-public/kernel
+	b, err = exec.Command("sh", "-c", "objdump -d ./xv6-public/kernel | tail -n +7 | grep -E \"[0-9a-f]{8}:\" | head -n 5000").CombinedOutput()
+	if err != nil {
+		panic(err)
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if len(line) < 7 {
+			continue
+		}
+		ix, err := strconv.ParseUint(line[:8], 16, 64)
+		if err != nil {
+			panic(err)
+		}
+		disasm[ix] = line[10:]
+		disasm[ix - 0x80000000] = line[10:]
+	}
 
 	bytes, err := loadFile(*filename)
 	if err != nil {
@@ -78,7 +94,7 @@ func main() {
 	}
 	fmt.Printf("enable GUI = %#v\n", *enableGUI)
 	fmt.Printf("len(bytes) = %d\n", len(bytes))
-	fmt.Printf("bytes =\n%s", hex.Dump(bytes))
+	// fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
 	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x8000, false, *silent, os.Stdin, os.Stdout, disasm)
