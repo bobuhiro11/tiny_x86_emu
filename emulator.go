@@ -1308,7 +1308,7 @@ func (e *Emulator) dump() {
 	)
 	color.New(color.FgGreen).Printf("(opecode=%02x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
-	color.New(color.FgCyan).Printf("EFLAGS=0x%08x\n", e.eflags)
+	e.eflags.dump()
 }
 
 // get from eip

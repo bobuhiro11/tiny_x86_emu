@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/bits"
+	"github.com/fatih/color"
 )
 
 // Eflags is a set of flags
@@ -54,4 +55,37 @@ func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 func (ef *Eflags) updatePF(result uint8) {
 	popcnt := bits.OnesCount8(result)
 	ef.setVal(ParityFlag, popcnt%2 == 0)
+}
+
+func (ef *Eflags) dump() {
+	s := "EFLAGS="
+	if ef.isEnable(CarryFlag) {
+		s += "CF "
+	}
+	if ef.isEnable(ParityFlag) {
+		s += "PF "
+	}
+	if ef.isEnable(AdjustFlag) {
+		s += "AF "
+	}
+	if ef.isEnable(ZeroFlag) {
+		s += "ZF "
+	}
+	if ef.isEnable(SignFlag) {
+		s += "SF "
+	}
+	if ef.isEnable(TrapFlag) {
+		s += "TF "
+	}
+	if ef.isEnable(InterruptFlag) {
+		s += "IF "
+	}
+	if ef.isEnable(DirectionFlag) {
+		s += "DF "
+	}
+	if ef.isEnable(OverflowFlag) {
+		s += "OF "
+	}
+	s += "\n"
+	color.New(color.FgCyan).Print(s)
 }
