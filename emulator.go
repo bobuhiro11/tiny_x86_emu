@@ -52,6 +52,11 @@ const (
 	GS=5
 )
 
+// Controll Register
+const (
+	CR4PageSizeExtension=0x10
+)
+
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
 	registers   [8]uint32  // general registers
@@ -320,17 +325,22 @@ func (e *Emulator) code0f() {
 		e.dumpGDTEntry(e.gdtrBase + 8)
 		e.dumpGDTEntry(e.gdtrBase + 16)
 	}
-	movR32Cr0 := func() {
+	movR32Cr := func() {
 		m := e.parseModRM()
-		e.setR32(m, e.cr[0])
+		// e.setR32(m, e.cr[m.opecode])
+		e.setRm32(m, e.cr[m.opecode])
 	}
-	movCr0R32 := func() {
+	movCrR32 := func() {
 		m := e.parseModRM()
-		e.cr[0] = e.getR32(m)
+		// e.cr[m.opecode] = e.getR32(m)
+		e.cr[m.opecode] = e.getRm32(m)
+		// fmt.Printf("%d %d\n", m.opecode, e.cr[m.opecode]) 
+		if m.opecode == 4 && e.cr[m.opecode] & CR4PageSizeExtension != 0{
+			fmt.Printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
+		}
 	}
 	MovzxR32Rm8:= func() {
 		m := e.parseModRM()
-		fmt.Printf("m.disp8=0x%x\n", m.disp32)
 		e.setRegister32(m.opecode, uint32(e.getMemory8(m.disp32)))
 	}
 	MovzxR32Rm16 := func() {
@@ -344,9 +354,9 @@ func (e *Emulator) code0f() {
 	if second == 0x01 {
 		lgdt()
 	} else if second == 0x20 {
-		movR32Cr0()
+		movR32Cr()
 	} else if second == 0x22 {
-		movCr0R32()
+		movCrR32()
 	} else if second == 0xB6 {
 		MovzxR32Rm8()
 	} else if second == 0xB7 {
@@ -1308,6 +1318,18 @@ func (e *Emulator) dump() {
 	)
 	color.New(color.FgGreen).Printf("(opecode=%02x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
+	color.New(color.FgCyan).Printf(""+
+		"CR0=0x%08x "+
+		"CR1=0x%08x "+
+		"CR2=0x%08x "+
+		"CR3=0x%08x "+
+		"CR4=0x%08x\n",
+		e.cr[0],
+		e.cr[1],
+		e.cr[2],
+		e.cr[3],
+		e.cr[4],
+	)
 	e.eflags.dump()
 }
 
