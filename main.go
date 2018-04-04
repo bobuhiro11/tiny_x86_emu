@@ -107,7 +107,8 @@ func main() {
 	chFinished := make(chan bool)
 	go func(chFinished chan bool) {
 		// time.Sleep(3000 * time.Millisecond)
-		for e.eip < 0x7c00+0x200000 {
+		// for e.eip < 0x7c00+0x200000 {
+		for {
 			if !*silent {
 				e.dump()
 			}

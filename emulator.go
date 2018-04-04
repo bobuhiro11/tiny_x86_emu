@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"io"
+	// "math"
 )
 
 // 32bit registers
@@ -55,6 +56,7 @@ const (
 // Controll Register
 const (
 	CR4PageSizeExtension=0x10
+	CR0PagingFlag=0x1<<31
 )
 
 // Emulator is an i386 Virtual Machine
@@ -337,6 +339,14 @@ func (e *Emulator) code0f() {
 		// fmt.Printf("%d %d\n", m.opecode, e.cr[m.opecode]) 
 		if m.opecode == 4 && e.cr[m.opecode] & CR4PageSizeExtension != 0{
 			fmt.Printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
+		} else if m.opecode == 3 {
+			fmt.Printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode] >> 12)
+			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
+				0, e.getMemory32((e.cr[m.opecode]>>22) + 4 * 0 ))
+			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
+				512, e.getMemory32((e.cr[m.opecode]>>22) + 4 * 512 ))
+		} else if m.opecode == 0 && e.cr[m.opecode] & CR0PagingFlag != 0{
+			fmt.Printf("CR0 paging is Enabled.\n")
 		}
 	}
 	MovzxR32Rm8:= func() {
@@ -431,7 +441,7 @@ func (e *Emulator) movRm32Imm32() {
 }
 
 func (e *Emulator) orEaxImm32() {
-	value := e.getCode32(1)
+	value := e.getCode32(1) | e.getRegister32(EAX)
 	e.setRegister32(EAX, value)
 	e.eip += 5
 }
@@ -581,6 +591,11 @@ func (e *Emulator) codeFf() {
 		fmt.Printf("address=0x%x jmpAddress=0x%x\n", address, jmpAddress)
 		e.eip = jmpAddress
 	}
+	jmpRm32 := func(e *Emulator, m ModRM) {
+		address := e.getRm32(m)
+		fmt.Printf("address=0x%x\n", address)
+		e.eip = address
+	}
 	e.eip++
 	m := e.parseModRM()
 	switch m.opecode {
@@ -592,8 +607,8 @@ func (e *Emulator) codeFf() {
 		callRm32(e, m)
 	// case 3:
 	// 	callM16(e, m)
-	// case 4:
-	// 	jmpRm32(e, m)
+	case 4:
+		jmpRm32(e, m)
 	// case 5:
 	// 	jmpM16(e, m)
 	case 6:
@@ -1161,24 +1176,47 @@ func (e *Emulator) calcMemoryAddress16(m ModRM) uint16 {
 	panic("ModRM mod = 4 is not implemented")
 }
 
+
 func (e *Emulator) calcMemoryAddress32(m ModRM) uint32 {
 	if m.mod == 0 {
 		// [register + resiger]
 		if m.rm == 5 {
 			return m.disp32 // Is this a EBP?
+		} else if m.rm == 4 {
+			return m.getSib(e)
 		}
 
 		return e.getRegister32(m.rm)
 	} else if m.mod == 1 {
 		// [register + disp8]
+		var result uint32
+		if m.rm == 4 {
+			result = m.getSib(e)
+		} else {
+			result = e.getRegister32(m.rm)
+		}
+
 		disp8 := m.getDisp8()
 		if disp8 < 0 {
-			return e.getRegister32(m.rm) - uint32(-disp8)
+			// return e.getRegister32(m.rm) + m.getSib(e) - uint32(-disp8)
+			result -= uint32(-disp8)
+		} else {
+			result += uint32(disp8)
 		}
-		return e.getRegister32(m.rm) + uint32(disp8)
+
+		// fmt.Printf("calcMemoryAddress32 = 0x%x 0x%x 0x%x\n",
+		// 	e.getRegister32(m.rm) , m.getSib(e) , uint32(disp8))
+		return result
 	} else if m.mod == 2 {
 		// [redister + disp16/32]
-		return e.getRegister32(m.rm) + m.disp32
+		var result uint32
+		if m.rm == 4 {
+			result = m.getSib(e)
+		} else {
+			result = e.getRegister32(m.rm)
+		}
+		result += m.disp32
+		return result
 	}
 	// register
 	panic("ModRM mod = 4 is not implemented")
@@ -1223,8 +1261,23 @@ func (e *Emulator) decRegister32(rm uint8, value uint32) {
 	e.registers[rm] -= value
 }
 
+func (e *Emulator) v2p(vaddress uint32) uint32 {
+	var paddress uint32
+	if (e.cr[0] & CR0PagingFlag != 0) && (e.cr[4] & CR4PageSizeExtension != 0) {
+		// paing
+		var pdtEntry uint32
+		for i := uint32(0); i < 4; i++ {
+			pdtEntry |= uint32(e.memory[e.cr[3] + 4 * (vaddress >> 22) +i]) << uint32(i*8)
+		}
+		paddress = pdtEntry + vaddress & 0x3FFFFF
+	} else {
+		paddress = vaddress
+	}
+	return paddress
+}
+
 func (e *Emulator) setMemory8(address uint32, value uint8) {
-	e.memory[address] = value
+	e.memory[e.v2p(address)] = value
 }
 
 func (e *Emulator) setMemory16(address uint32, value uint16) {
@@ -1241,7 +1294,7 @@ func (e *Emulator) setMemory32(address, value uint32) {
 
 // TODO: consider linear address transformation using DS
 func (e *Emulator) getMemory8(address uint32) uint8 {
-	return e.memory[address]
+	return e.memory[e.v2p(address)]
 }
 
 func (e *Emulator) getMemory16(address uint32) uint16 {
@@ -1343,7 +1396,7 @@ func (e *Emulator) getCode8(index int32) uint8 {
 	} else {
 		addr = e.eip + uint32(index)
 	}
-	return e.memory[addr]
+	return e.memory[e.v2p(addr)]
 }
 
 func (e *Emulator) getSignCode8(index int32) int8 {
@@ -1387,8 +1440,25 @@ type ModRM struct {
 	mod     uint8
 	opecode uint8 // This can be regarded as regIndex.
 	rm      uint8
-	sib     uint8
+	sib     uint8 // sib byte
 	disp32  uint32 // This can be regarded as (disp8, signed int8, disp16 signed int16).
+}
+
+func (m *ModRM) getSib(e *Emulator) uint32 {
+	if m.mod <3 && m.rm==4 {
+		base := uint8(m.sib & 0x7)
+		index := uint8((m.sib >> 3) & 0x7)
+		scale := uint8((m.sib >> 6) & 0x3)
+
+		result := e.getRegister32(base)
+		if scale > 0 {
+			result += e.getRegister32(index) * uint32(1<<scale)
+		}
+
+		fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib,base,index,scale,result)
+		return result
+	}
+	return uint32(0)
 }
 
 func (m *ModRM) getDisp8() int8 {
@@ -1421,6 +1491,7 @@ func (e *Emulator) parseModRM() ModRM {
 	}
 
 	e.eip++
+	fmt.Printf("get mod=0x%x opecode=0x%x rm=0x%x\n", m.mod, m.opecode, m.rm)
 
 	if e.cr[0]&1 == 0 {
 		// 16 bit mode
@@ -1436,6 +1507,7 @@ func (e *Emulator) parseModRM() ModRM {
 		// 32 bit mode
 		if m.mod != 3 && m.rm == 4 {
 			m.sib = e.getCode8(0)
+			fmt.Printf("get sib=0x%x\n", m.sib)
 			e.eip++
 		}
 
