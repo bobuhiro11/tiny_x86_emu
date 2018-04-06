@@ -4,12 +4,12 @@ import (
 	// "encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/hajimehoshi/ebiten"
-	"github.com/hajimehoshi/ebiten/ebitenutil"
+	// "github.com/hajimehoshi/ebiten"
+	// "github.com/hajimehoshi/ebiten/ebitenutil"
 	"image"
 	"io/ioutil"
-	"log"
-	"math/rand"
+	// "log"
+	// "math/rand"
 	"os"
 	"os/exec"
 	"strconv"
@@ -28,24 +28,24 @@ var (
 	vram = image.NewRGBA(image.Rect(0, 0, width, height))
 )
 
-func update(screen *ebiten.Image) error {
-	for i := 0; i < width*height; i++ {
-		vram.Pix[4*i] = uint8(rand.Int() & 0xFF)
-		vram.Pix[4*i+1] = uint8(rand.Int() & 0xFF)
-		vram.Pix[4*i+2] = uint8(rand.Int() & 0xFF)
-		vram.Pix[4*i+3] = 0xff
-	}
-	if ebiten.IsRunningSlowly() {
-	}
-	screen.ReplacePixels(vram.Pix)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %f", ebiten.CurrentFPS()))
-	return nil
-}
+// func update(screen *ebiten.Image) error {
+// 	for i := 0; i < width*height; i++ {
+// 		vram.Pix[4*i] = uint8(rand.Int() & 0xFF)
+// 		vram.Pix[4*i+1] = uint8(rand.Int() & 0xFF)
+// 		vram.Pix[4*i+2] = uint8(rand.Int() & 0xFF)
+// 		vram.Pix[4*i+3] = 0xff
+// 	}
+// 	if ebiten.IsRunningSlowly() {
+// 	}
+// 	screen.ReplacePixels(vram.Pix)
+// 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %f", ebiten.CurrentFPS()))
+// 	return nil
+// }
 
 func main() {
 	runtime.LockOSThread()
 	filename := flag.String("f", "", "binary filename (*.bin)")
-	enableGUI := flag.Bool("gui", false, "gui mode")
+	// enableGUI := flag.Bool("gui", false, "gui mode")
 	silent := flag.Bool("silent", false, "silent mode")
 	flag.Parse()
 
@@ -71,7 +71,7 @@ func main() {
 		disasm[ix] = strings.Join(row[1:], " ")
 	}
 	// disasm binary of ./xv6-public/kernel
-	b, err = exec.Command("sh", "-c", "objdump -d ./xv6-public/kernel | tail -n +7 | grep -E \"[0-9a-f]{8}:\" | head -n 5000").CombinedOutput()
+	b, err = exec.Command("sh", "-c", "objdump -d ./xv6-public/kernel | tail -n +7 | grep -E \"[0-9a-f]{8}:\"").CombinedOutput()
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +92,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	fmt.Printf("enable GUI = %#v\n", *enableGUI)
+	// fmt.Printf("enable GUI = %#v\n", *enableGUI)
 	fmt.Printf("len(bytes) = %d\n", len(bytes))
 	// fmt.Printf("bytes =\n%s", hex.Dump(bytes))
 
@@ -104,8 +104,8 @@ func main() {
 	e.io.hdds[0],_ = os.Open(*filename)
 
 	// emulate
-	chFinished := make(chan bool)
-	go func(chFinished chan bool) {
+	// chFinished := make(chan bool)
+	// go func(chFinished chan bool) {
 		// time.Sleep(3000 * time.Millisecond)
 		// for e.eip < 0x7c00+0x200000 {
 		for {
@@ -126,17 +126,17 @@ func main() {
 			e.dump()
 		}
 		fmt.Println("End of program")
-		chFinished <- true
-	}(chFinished)
+		// chFinished <- true
+	// }(chFinished)
 
 	// setup gui
-	if *enableGUI {
-		err := ebiten.Run(update, width, height, 2, "x86 emulator")
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	}
-	<-chFinished
+	// if *enableGUI {
+	// 	err := ebiten.Run(update, width, height, 2, "x86 emulator")
+	// 	if err != nil {
+	// 		log.Fatal(err.Error())
+	// 	}
+	// }
+	// <-chFinished
 }
 
 func loadFile(filename string) ([]byte, error) {

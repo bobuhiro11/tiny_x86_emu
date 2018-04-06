@@ -106,6 +106,12 @@ func (e *Emulator) execInst() error {
 		e.addRm32R32()
 	case 0x03:
 		e.addR32Rm32()
+	case 0x05:
+		e.addEaxImm32()
+	case 0x09:
+		e.orRm32R32()
+	case 0x0B:
+		e.orR32Rm32()
 	case 0x0D:
 		e.orEaxImm32()
 	case 0x0F:
@@ -130,6 +136,8 @@ func (e *Emulator) execInst() error {
 		e.cmpR32Rm32()
 	case 0x3c:
 		e.cmpAlImm8()
+	case 0x3d:
+		e.cmpEaxImm32()
 	case 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47:
 		e.incR32()
 	case 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f:
@@ -171,6 +179,8 @@ func (e *Emulator) execInst() error {
 		e.js()
 	case 0x79:
 		e.jns()
+	case 0x85:
+		e.testRm32R32()
 	case 0x7A:
 		e.jp()
 	case 0x7B:
@@ -213,6 +223,8 @@ func (e *Emulator) execInst() error {
 		e.nop()
 	case 0xAA:
 		e.stosb()
+	case 0xAB:
+		e.stosd()
 	case 0xC1:
 		e.codeC1()
 	case 0xC3:
@@ -259,7 +271,7 @@ func (e *Emulator) execInst() error {
 		// rep prefix
 		fmt.Printf("repeat %d times.\n", e.getRegister32(ECX))
 		eip := e.eip + 1
-		for e.getRegister32(ECX) > 1 {
+		for e.getRegister32(ECX) > 0 {
 			e.eip = eip
 			e.execInst()
 			e.decRegister32(ECX, 1)
@@ -294,12 +306,24 @@ func (e *Emulator) stosb() {
 	e.eip++
 }
 
+func (e *Emulator) stosd() {
+	address := e.getRegister32(EDI)
+	value := e.getRegister32(EAX)
+	e.setMemory32(address, value)
+	if e.eflags.isEnable(DirectionFlag) {
+		e.decRegister32(EDI, 1)
+	} else {
+		e.incRegister32(EDI, 1)
+	}
+	e.eip++
+}
+
 func (e *Emulator) insd() {
 	ioAddress := e.getRegister16(DX)
 	value := e.io.in32(ioAddress)
 	memAddress := e.getRegister32(EDI)
-	fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[0x%x]\n",
-		value, ioAddress, memAddress)
+	fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
+		value, ioAddress, memAddress, e.v2p(memAddress))
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
 	e.eip++
@@ -446,13 +470,27 @@ func (e *Emulator) orEaxImm32() {
 	e.eip += 5
 }
 
+func (e *Emulator) addEaxImm32() {
+value := e.getCode32(1) + e.getRegister32(EAX)
+	e.setRegister32(EAX, value)
+	e.eip += 5
+}
+
 func (e *Emulator) code81() {
 	addRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip+=4
 		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
-	result := uint64(rm32) + uint64(imm32)
+		result := uint64(rm32) + uint64(imm32)
+		e.setRm32(m, uint32(result))
+	}
+	andRm32Imm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm32 := e.getCode32(0)
+		e.eip+=4
+		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		result := uint64(rm32) & uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
@@ -476,6 +514,8 @@ func (e *Emulator) code81() {
 	switch m.opecode {
 	case 0:
 		addRm32Imm32(e, m)
+	case 4:
+		andRm32Imm32(e, m)
 	case 7:
 		cmpRm32Imm32(e, m)
 	default:
@@ -653,12 +693,28 @@ func (e *Emulator) subRm32R32() {
 	e.setRm32(m, rm32-r32)
 }
 
+func (e *Emulator) orRm32R32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	e.setRm32(m, r32 | rm32)
+}
+
 func (e *Emulator) addRm32R32() {
 	e.eip++
 	m := e.parseModRM()
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
 	e.setRm32(m, r32+rm32)
+}
+
+func (e *Emulator) orR32Rm32() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	e.setR32(m, r32 | rm32)
 }
 
 func (e *Emulator) addR32Rm32() {
@@ -722,6 +778,14 @@ func (e *Emulator) cmpRm32R32() { e.eip++
 	e.eflags.updateBySub(rm32, r32, result)
 }
 
+func (e *Emulator) cmpEaxImm32() {
+	ax := e.getRegister32(EAX)
+	value := e.getCode32(1)
+	result := uint64(ax) - uint64(value)
+	e.eip += 5
+	e.eflags.updateBySub(ax, value, result)
+}
+
 func (e *Emulator) testEaxImm32() {
 	ax := e.getRegister32(EAX)
 	value := e.getCode32(1)
@@ -735,6 +799,20 @@ func (e *Emulator) testEaxImm32() {
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eip += 5
+}
+
+func (e *Emulator) testRm32R32() {
+	e.eip++
+	m := e.parseModRM()
+	result := e.getRm32(m) & e.getR32(m)
+	if result == 0 {
+		e.eflags.set(ZeroFlag)
+	} else {
+		e.eflags.unset(ZeroFlag)
+	}
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
+	e.eflags.updatePF(uint8(result & 0xFF))
 }
 
 func (e *Emulator) testAxImm16() {

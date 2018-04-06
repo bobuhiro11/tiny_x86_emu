@@ -1,6 +1,6 @@
 rebuild: clean build
 build:
-	go build -gcflags '-N -l'
+	go build
 test: guest_bin xv6
 	pkgs=$(go list ./... | grep -v /vendor/)
 	go vet ${pkgs}
