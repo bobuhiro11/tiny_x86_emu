@@ -207,6 +207,8 @@ func (e *Emulator) execInst() error {
 		e.leaR32Rm32()
 	case 0xA1:
 		e.movEaxMoffs32()
+	case 0xA3:
+		e.movMoffs32Eax()
 	case 0xA8:
 		e.testAlImm8()
 	case 0xA9:
@@ -453,6 +455,14 @@ func (e *Emulator) movEaxMoffs32() {
 	value := e.getMemory32(e.getCode32(1))
 	fmt.Printf("value=0x%x\n", value)
 	e.setRegister32(EAX, value)
+	e.eip += 5
+}
+
+func (e *Emulator) movMoffs32Eax() {
+	value := e.getRegister32(EAX)
+	fmt.Printf("value=0x%x\n", value)
+	// e.setRegister32(EAX, value)
+	e.setMemory32(e.getCode32(1), value)
 	e.eip += 5
 }
 
@@ -1516,10 +1526,11 @@ func (e *Emulator) getSingedCode16(index int32) int16 {
 // ModRM parameter
 type ModRM struct {
 	mod     uint8
-	opecode uint8 // This can be regarded as regIndex.
+	opecode uint8    // This can be regarded as regIndex.
 	rm      uint8
-	sib     uint8 // sib byte
-	disp32  uint32 // This can be regarded as (disp8, signed int8, disp16 signed int16).
+	disp32  uint32   // This can be regarded as (disp8, signed int8, disp16 signed int16).
+	sib     uint8    // sib byte
+	disp32Sib uint32 // disp32 for sib
 }
 
 func (m *ModRM) getSib(e *Emulator) uint32 {
@@ -1528,7 +1539,18 @@ func (m *ModRM) getSib(e *Emulator) uint32 {
 		index := uint8((m.sib >> 3) & 0x7)
 		scale := uint8((m.sib >> 6) & 0x3)
 
-		result := e.getRegister32(base)
+		// calc base value
+		var result uint32
+		if m.mod == 2 {
+			result = e.getRegister32(base) + m.disp32Sib
+		} else if m.mod == 1 {
+			result = e.getRegister32(base) + (m.disp32Sib & 0xFF) // TODO: minus value?
+		} else if base == 5 {
+			result = m.disp32Sib
+		} else {
+			result = e.getRegister32(base)
+		}
+
 		if scale > 0 {
 			result += e.getRegister32(index) * uint32(1<<scale)
 		}
@@ -1585,8 +1607,15 @@ func (e *Emulator) parseModRM() ModRM {
 		// 32 bit mode
 		if m.mod != 3 && m.rm == 4 {
 			m.sib = e.getCode8(0)
-			fmt.Printf("get sib=0x%x\n", m.sib)
 			e.eip++
+			if m.mod == 2 || (m.mod == 0 && (m.sib & 0x7 == 5)) {
+				m.disp32Sib = e.getCode32(0)
+				e.eip += 4
+			} else if m.mod == 1 {
+				m.disp32Sib = uint32(e.getCode8(0))
+				e.eip ++
+			}
+			fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
 		}
 
 		if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
