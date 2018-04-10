@@ -1,8 +1,10 @@
 #/bin/bash
-for bin in $(ls ./guest/mbr.bin)
+for bin in $(ls ./xv6-public/xv6.img)
+# for bin in $(ls ./guest/mbr.bin)
 # for bin in $(ls ./guest/*.bin)
 do
-  reg_file=$(echo $bin | sed -e 's/.bin/.regs/')
+  # reg_file=$(echo $bin | sed -e 's/.bin/.regs/')
+  reg_file=$(echo $bin | sed -e 's/.img/.regs/')
   qemu-system-i386 -hdb ${bin} -S -gdb tcp::1234 -nographic 2>/dev/null &
   qemu_pid=$!;
   echo bin=${bin} reg_file=${reg_file} qemu_pid=${qemu_pid};
@@ -24,10 +26,9 @@ do
              -e "fs\s*0x" \
              -e "gs\s*0x" \
              -e "===" \
-     | awk '{print $1,$2;}'
-     > ${reg_file}
+     | awk '{print $1,$2;}' > ${reg_file}
   gdb_pid=$!;
-  sleep 1
+  sleep 10
   kill ${qemu_pid};
   kill ${gdb_pid};
 done
