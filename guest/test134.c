@@ -12,10 +12,20 @@ int fib(int n) {
     if (n < 2) {
         return 1;
     } else {
-        return 2;
+        return fib(n) + fib(n-2);
     }
 }
 
 int main(void) {
-    return f(5);
+    int res = 0;
+    
+    res += f(5) - 0;
+    res += fib(0) - 1;
+    res += fib(1) - 1;
+    // res += fib(2) - 2;
+    // res += fib(3) - 3;
+    // res += fib(4) - 5;
+    // res += fib(5) - 8;
+
+    return res;
 }

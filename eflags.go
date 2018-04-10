@@ -2,7 +2,7 @@ package main
 
 import (
 	"math/bits"
-	"fmt"
+	// "fmt"
 	"github.com/fatih/color"
 )
 
@@ -47,7 +47,7 @@ func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 	sign2 := (v2 >> 31) & 0x01
 	signr := uint32((result >> 31) & 0x01)
 
-	fmt.Printf("result=0x%08x sign1=%v sign2=%v signr=%v\n", result, sign1, sign2, signr)
+	// fmt.Printf("result=0x%08x sign1=%v sign2=%v signr=%v\n", result, sign1, sign2, signr)
 
 	ef.setVal(CarryFlag, (result>>32) != 0)
 	ef.setVal(ZeroFlag, result == 0)

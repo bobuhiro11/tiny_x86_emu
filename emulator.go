@@ -1083,7 +1083,7 @@ func (e *Emulator) jns() {
 }
 
 func (e *Emulator) jg() {
-	if e.eflags.isEnable(ZeroFlag) && e.eflags.isEnable(SignFlag) == e.eflags.isEnable(OverflowFlag) {
+	if !e.eflags.isEnable(ZeroFlag) && e.eflags.isEnable(SignFlag) == e.eflags.isEnable(OverflowFlag) {
 		e.eip += uint32(2) + uint32(e.getSignCode8(1))
 	} else {
 		e.eip += uint32(2)
