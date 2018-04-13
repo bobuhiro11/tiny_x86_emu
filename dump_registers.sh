@@ -5,8 +5,7 @@ do
   qemu-system-i386 -hdb ${bin} -S -gdb tcp::1234 -nographic 2>/dev/null &
   qemu_pid=$!
   gdb -x ./gdb.script 2>/dev/null > $tmp_file
-  gdb_pid=$!
-  echo bin=${bin} qemu_pid=${qemu_pid} gdb_pid=${gdb_pid} >&2
+  echo bin=${bin} qemu_pid=${qemu_pid} >&2
 
   cat $tmp_file | grep -e "eax\s*0x" \
              -e "ecx\s*0x" \
@@ -26,5 +25,4 @@ do
              -e "gs\s*0x" \
              | awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
   kill ${qemu_pid};
-  kill ${gdb_pid};
 done

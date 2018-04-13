@@ -39,4 +39,4 @@ guest_bin:
 	# objdump -D -b binary -m i386:x86-64 ./guest/addjmp.bin
 	# ndisasm -b 32 guest/test143.bin
 	# hexdump -C guest/inc.bin
-	./dump_registers.sh
+	# ./dump_registers.sh
