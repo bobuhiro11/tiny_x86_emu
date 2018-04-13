@@ -1,15 +1,14 @@
 #/bin/bash
 for bin in $(ls ./xv6-public/xv6.img)
-# for bin in $(ls ./guest/mbr.bin)
-# for bin in $(ls ./guest/*.bin)
 do
-  # reg_file=$(echo $bin | sed -e 's/.bin/.regs/')
-  reg_file=$(echo $bin | sed -e 's/.img/.regs/')
+  tmp_file=$(mktemp)
   qemu-system-i386 -hdb ${bin} -S -gdb tcp::1234 -nographic 2>/dev/null &
-  qemu_pid=$!;
-  echo bin=${bin} reg_file=${reg_file} qemu_pid=${qemu_pid};
-  gdb -x ./gdb.script 2>/dev/null \
-      | grep -e "eax\s*0x" \
+  qemu_pid=$!
+  gdb -x ./gdb.script 2>/dev/null > $tmp_file
+  gdb_pid=$!
+  echo bin=${bin} qemu_pid=${qemu_pid} gdb_pid=${gdb_pid} >&2
+
+  cat $tmp_file | grep -e "eax\s*0x" \
              -e "ecx\s*0x" \
              -e "edx\s*0x" \
              -e "ebx\s*0x" \
@@ -25,10 +24,7 @@ do
              -e "es\s*0x" \
              -e "fs\s*0x" \
              -e "gs\s*0x" \
-             -e "===" \
-     | awk '{print $1,$2;}' > ${reg_file}
-  gdb_pid=$!;
-  sleep 10
+             | awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
   kill ${qemu_pid};
   kill ${gdb_pid};
 done

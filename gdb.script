@@ -2,13 +2,11 @@ target remote localhost:1234
 set architecture i8086
 break *0x7c00
 c
-echo =====================\n
 info registers
 set variable $i = 1000
 while $i > 0
     si
     info registers
-    echo =====================\n
     set variable $i -= 1
 end
 quit
