@@ -9,7 +9,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type QemuStatus struct {
+type RegisterSet struct {
 	Eax      string `yaml:"eax"`
 	Ecx      string `yaml:"ecx"`
 	Edx      string `yaml:"edx"`
@@ -56,11 +56,16 @@ quit
 	return f.Name()
 }
 
-func ExecQemu() {
+// return register values obtained from qemu and gdb
+func ExecQemu() []RegisterSet {
 	gdbScriptPath := MakeGdbScript()
 
 	qemuCmd := exec.Command("qemu-system-i386","-hdb","./xv6-public/xv6.img","-S","-gdb","tcp::1234","-nographic")
 	qemuCmd.Start()
+	defer func() {
+		qemuCmd.Process.Kill()
+		qemuCmd.Wait()
+	}()
 	fmt.Printf("qemu pid=%d\n", qemuCmd.Process.Pid)
 
 	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x " + gdbScriptPath + ` 2>/dev/null | grep \
@@ -84,19 +89,18 @@ func ExecQemu() {
 `).Output()
 	fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
-	// var d YamlData
-	var d []QemuStatus
-	err := yaml.Unmarshal([]byte(gdbOutput), &d)
+	var res []RegisterSet
+	err := yaml.Unmarshal([]byte(gdbOutput), &res)
 	if err != nil {
 		panic(err)
 	}
 
-	qemuCmd.Process.Kill()
-	qemuCmd.Wait()
+	return res
 }
 
 func TestHello(t *testing.T) {
-	ExecQemu()
+	q := ExecQemu()
+	fmt.Printf("%#v\n", q[0])
 	if false {
 		t.Fatalf("TestHello fail.")
 	}
