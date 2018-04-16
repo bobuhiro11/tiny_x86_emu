@@ -9,18 +9,30 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type YamlData struct {
-	QemuStatuses []QemuStatus
-}
-
 type QemuStatus struct {
-	Eax string `yaml:"eax"`
+	Eax      string `yaml:"eax"`
+	Ecx      string `yaml:"ecx"`
+	Edx      string `yaml:"edx"`
+	Ebx      string `yaml:"ebx"`
+	Esp      string `yaml:"esp"`
+	Ebp      string `yaml:"ebp"`
+	Esi      string `yaml:"esi"`
+	Edi      string `yaml:"edi"`
+	Eip      string `yaml:"eip"`
+	Eflags   string `yaml:"eflags"`
+	Cs       string `yaml:"cs"`
+	Ss       string `yaml:"ss"`
+	Ds       string `yaml:"ds"`
+	Es       string `yaml:"es"`
+	Fs       string `yaml:"fs"`
+	Gs       string `yaml:"gs"`
 }
 
 const (
-	NumStep = 1
+	NumStep = 1000
 )
 
+// return the path of the gdb script
 func MakeGdbScript() string {
 	f, _ := ioutil.TempFile("", "gdb.script")
 	defer f.Close()
@@ -28,6 +40,7 @@ func MakeGdbScript() string {
 	f.Write([]byte(`
 target remote localhost:1234
 set architecture i8086
+set confirm off
 break *0x7c00
 c
 info registers
@@ -38,19 +51,19 @@ while $i > 0
     set variable $i -= 1
 end
 quit
-y
 `))
 
 	return f.Name()
 }
 
 func ExecQemu() {
-	gdbscript := MakeGdbScript()
+	gdbScriptPath := MakeGdbScript()
 
 	qemuCmd := exec.Command("qemu-system-i386","-hdb","./xv6-public/xv6.img","-S","-gdb","tcp::1234","-nographic")
 	qemuCmd.Start()
+	fmt.Printf("qemu pid=%d\n", qemuCmd.Process.Pid)
 
-	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x " + gdbscript + ` 2>/dev/null | grep \
+	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x " + gdbScriptPath + ` 2>/dev/null | grep \
 	-e "eax\s*0x" \
 	-e "ecx\s*0x" \
 	-e "edx\s*0x" \
@@ -69,10 +82,10 @@ func ExecQemu() {
 	-e "gs\s*0x" \
 	| awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
 `).Output()
-	fmt.Printf("qemu pid=%d\n", qemuCmd.Process.Pid)
-	fmt.Printf("gdb output=%s\n", gdbOutput)
+	fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
-	var d YamlData
+	// var d YamlData
+	var d []QemuStatus
 	err := yaml.Unmarshal([]byte(gdbOutput), &d)
 	if err != nil {
 		panic(err)
