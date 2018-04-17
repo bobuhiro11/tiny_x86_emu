@@ -87,7 +87,7 @@ func main() {
 		disasm[ix - 0x80000000] = line[10:]
 	}
 
-	bytes, err := loadFile(*filename)
+	bytes, err := LoadFile(*filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -139,7 +139,8 @@ func main() {
 	// <-chFinished
 }
 
-func loadFile(filename string) ([]byte, error) {
+// LoadFile by filename
+func LoadFile(filename string) ([]byte, error) {
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err

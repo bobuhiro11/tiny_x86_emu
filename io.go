@@ -32,7 +32,7 @@ func (io *IO) in8(address uint16) uint8 {
 	// fmt.Printf("io.in8 from 0x%x\n", address)
 	switch address {
 	case 0x0064: // Keyboard Controller Read Status
-		io.memory[address] = 0
+		io.memory[address] = 0x1c
 	case 0x01f0: // Data Register (Read sector 32bit-chunk, 128 times)
 		b := make([]byte, 1)
 		io.hdds[0].Read(b)

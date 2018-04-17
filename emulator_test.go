@@ -105,7 +105,7 @@ func TestMbr(t *testing.T) {
 }
 
 func run(t *testing.T, filename string, protectedEnable bool) (*Emulator, string) {
-	bin, err := loadFile(filename)
+	bin, err := LoadFile(filename)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

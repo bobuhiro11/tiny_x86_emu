@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"os/exec"
+	"os"
+	"bytes"
 	"fmt"
 	"strconv"
 	"io/ioutil"
@@ -29,7 +31,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 1000
+	NumStep = 100
 )
 
 // return the path of the gdb script
@@ -43,7 +45,6 @@ set architecture i8086
 set confirm off
 break *0x7c00
 c
-info registers
 set variable $i = ` + strconv.Itoa(NumStep) + `
 while $i > 0
     si
@@ -54,6 +55,42 @@ quit
 `))
 
 	return f.Name()
+}
+
+// return register values obtained from this emulator
+func ExecEmu() []RegisterSet {
+	// setup emulator
+	reader := &bytes.Buffer{}
+	writer := &bytes.Buffer{}
+	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x8000, false, true, reader, writer, map[uint64]string{})
+
+	// load file
+	bin, err := LoadFile("./xv6-public/xv6.img")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+	for i := 0; i < len(bin); i++ {
+		e.memory[uint32(i+0x7c00)] = bin[i]
+	}
+
+	// main loop
+	var res []RegisterSet
+	for i := 0;  i< NumStep; i++ {
+		err := e.execInst()
+		if err != nil {
+			panic(err.Error())
+		}
+		if e.eip == 0 || e.eip == 0x7c00 {
+			break
+		}
+		regSet := RegisterSet {
+			Eax: fmt.Sprintf("0x%x", e.getRegister32(EAX)),
+			Eip: fmt.Sprintf("0x%x", e.eip),
+		}
+		res = append(res, regSet)
+	}
+	return res
 }
 
 // return register values obtained from qemu and gdb
@@ -92,16 +129,33 @@ func ExecQemu() []RegisterSet {
 	var res []RegisterSet
 	err := yaml.Unmarshal([]byte(gdbOutput), &res)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 
 	return res
 }
 
 func TestHello(t *testing.T) {
-	q := ExecQemu()
-	fmt.Printf("%#v\n", q[0])
-	if false {
-		t.Fatalf("TestHello fail.")
+	QemuRegSet := ExecQemu()
+	EmuRegSet := ExecEmu()
+	if len(QemuRegSet) != NumStep || len(EmuRegSet) != NumStep {
+		t.Fatalf("len(QemuRegSet) != len(EmuRegSet)\n")
+	}
+
+	for i := 0; i<NumStep; i++ {
+		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
+			t.Fatalf("bad eip: qemu_eip=%s emu_eip=%s\n",
+			QemuRegSet[i].Eip, EmuRegSet[i].Eip)
+		// } else {
+		// 	fmt.Printf("correct eip: qemu_eip=%s emu_eip=%s\n",
+		// 	QemuRegSet[i].Eip, EmuRegSet[i].Eip)
+		}
+		// if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
+		// 	t.Fatalf("bad eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",
+		// 	QemuRegSet[i].Eip, QemuRegSet[i].Eax, EmuRegSet[i].Eax)
+		// } else {
+		// 	fmt.Printf("correct eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",
+		// 	QemuRegSet[i].Eip, QemuRegSet[i].Eax, EmuRegSet[i].Eax)
+		// }
 	}
 }
