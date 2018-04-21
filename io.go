@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"bufio"
-	"os"
+	"fmt"
 	"io"
+	"os"
 )
 
 const (
@@ -21,7 +21,7 @@ type IO struct {
 }
 
 // NewIO creates New IO
-func NewIO(reader *io.Reader, writer *io.Writer) IO{
+func NewIO(reader *io.Reader, writer *io.Writer) IO {
 	return IO{
 		reader: reader,
 		writer: writer,
@@ -55,7 +55,7 @@ func (io *IO) in32(address uint16) uint32 {
 	return ret
 }
 
-func (io *IO) out8(address uint16, value uint8){
+func (io *IO) out8(address uint16, value uint8) {
 	fmt.Printf("io.out8 address=0x%x value=0x%x\n", address, value)
 	io.memory[address] = value
 	switch address {
@@ -64,20 +64,20 @@ func (io *IO) out8(address uint16, value uint8){
 		return
 	case 0x01f3: // Secter Number
 		io.hdds[0].Seek(0, 0) // Read a entire sector (TODO: check)
-		offset, _ := io.hdds[0].Seek(int64(value) * SectorSize, 1)
+		offset, _ := io.hdds[0].Seek(int64(value)*SectorSize, 1)
 		fmt.Printf("Secter Number=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f4: // Cylinder low
-		offset, _ := io.hdds[0].Seek(int64(uint32(value) << 8) * SectorSize, 1)
+		offset, _ := io.hdds[0].Seek(int64(uint32(value)<<8)*SectorSize, 1)
 		fmt.Printf("Sylinder Low=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f5: // Cylinder High
-		offset, _ := io.hdds[0].Seek(int64(uint32(value) << 16) * SectorSize, 1)
+		offset, _ := io.hdds[0].Seek(int64(uint32(value)<<16)*SectorSize, 1)
 		fmt.Printf("Sylinder High=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f6: // Drive/Head
-		offset, _ := io.hdds[0].Seek(int64((uint32(value)&0x1F) << 24) * SectorSize, 1)
-		fmt.Printf("Drive Number=%d offset=%d\n", (io.memory[address]&0x8) >> 4, offset)
+		offset, _ := io.hdds[0].Seek(int64((uint32(value)&0x1F)<<24)*SectorSize, 1)
+		fmt.Printf("Drive Number=%d offset=%d\n", (io.memory[address]&0x8)>>4, offset)
 		return
 	case 0x01f7: // Command Register
 		fmt.Printf("Command Register=%d\n", io.memory[address])

@@ -1,33 +1,33 @@
 package main
 
 import (
-	"testing"
-	"os/exec"
-	"os"
 	"bytes"
 	"fmt"
-	"strconv"
-	"io/ioutil"
 	yaml "gopkg.in/yaml.v2"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"strconv"
+	"testing"
 )
 
 type RegisterSet struct {
-	Eax      string `yaml:"eax"`
-	Ecx      string `yaml:"ecx"`
-	Edx      string `yaml:"edx"`
-	Ebx      string `yaml:"ebx"`
-	Esp      string `yaml:"esp"`
-	Ebp      string `yaml:"ebp"`
-	Esi      string `yaml:"esi"`
-	Edi      string `yaml:"edi"`
-	Eip      string `yaml:"eip"`
-	Eflags   string `yaml:"eflags"`
-	Cs       string `yaml:"cs"`
-	Ss       string `yaml:"ss"`
-	Ds       string `yaml:"ds"`
-	Es       string `yaml:"es"`
-	Fs       string `yaml:"fs"`
-	Gs       string `yaml:"gs"`
+	Eax    string `yaml:"eax"`
+	Ecx    string `yaml:"ecx"`
+	Edx    string `yaml:"edx"`
+	Ebx    string `yaml:"ebx"`
+	Esp    string `yaml:"esp"`
+	Ebp    string `yaml:"ebp"`
+	Esi    string `yaml:"esi"`
+	Edi    string `yaml:"edi"`
+	Eip    string `yaml:"eip"`
+	Eflags string `yaml:"eflags"`
+	Cs     string `yaml:"cs"`
+	Ss     string `yaml:"ss"`
+	Ds     string `yaml:"ds"`
+	Es     string `yaml:"es"`
+	Fs     string `yaml:"fs"`
+	Gs     string `yaml:"gs"`
 }
 
 const (
@@ -40,19 +40,19 @@ func MakeGdbScript() string {
 	defer f.Close()
 
 	f.Write([]byte(`
-target remote localhost:1234
-set architecture i8086
-set confirm off
-break *0x7c00
-c
-set variable $i = ` + strconv.Itoa(NumStep) + `
-while $i > 0
-    si
-    info registers
-    set variable $i -= 1
-end
-quit
-`))
+	target remote localhost:1234
+	set architecture i8086
+	set confirm off
+	break *0x7c00
+	c
+	set variable $i = ` + strconv.Itoa(NumStep) + `
+	while $i > 0
+	si
+	info registers
+	set variable $i -= 1
+	end
+	quit
+	`))
 
 	return f.Name()
 }
@@ -76,7 +76,7 @@ func ExecEmu() []RegisterSet {
 
 	// main loop
 	var res []RegisterSet
-	for i := 0;  i< NumStep; i++ {
+	for i := 0; i < NumStep; i++ {
 		err := e.execInst()
 		if err != nil {
 			panic(err.Error())
@@ -84,7 +84,7 @@ func ExecEmu() []RegisterSet {
 		if e.eip == 0 || e.eip == 0x7c00 {
 			break
 		}
-		regSet := RegisterSet {
+		regSet := RegisterSet{
 			Eax: fmt.Sprintf("0x%x", e.getRegister32(EAX)),
 			Eip: fmt.Sprintf("0x%x", e.eip),
 		}
@@ -97,7 +97,7 @@ func ExecEmu() []RegisterSet {
 func ExecQemu() []RegisterSet {
 	gdbScriptPath := MakeGdbScript()
 
-	qemuCmd := exec.Command("qemu-system-i386","-hdb","./xv6-public/xv6.img","-S","-gdb","tcp::1234","-nographic")
+	qemuCmd := exec.Command("qemu-system-i386", "-hdb", "./xv6-public/xv6.img", "-S", "-gdb", "tcp::1234", "-nographic")
 	qemuCmd.Start()
 	defer func() {
 		qemuCmd.Process.Kill()
@@ -105,7 +105,7 @@ func ExecQemu() []RegisterSet {
 	}()
 	fmt.Printf("qemu pid=%d\n", qemuCmd.Process.Pid)
 
-	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x " + gdbScriptPath + ` 2>/dev/null | grep \
+	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath+` 2>/dev/null | grep \
 	-e "eax\s*0x" \
 	-e "ecx\s*0x" \
 	-e "edx\s*0x" \
@@ -123,7 +123,7 @@ func ExecQemu() []RegisterSet {
 	-e "fs\s*0x" \
 	-e "gs\s*0x" \
 	| awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
-`).Output()
+	`).Output()
 	fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
 	var res []RegisterSet
@@ -142,13 +142,13 @@ func TestHello(t *testing.T) {
 		t.Fatalf("len(QemuRegSet) != len(EmuRegSet)\n")
 	}
 
-	for i := 0; i<NumStep; i++ {
+	for i := 0; i < NumStep; i++ {
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
 			t.Fatalf("bad eip: qemu_eip=%s emu_eip=%s\n",
-			QemuRegSet[i].Eip, EmuRegSet[i].Eip)
-		// } else {
-		// 	fmt.Printf("correct eip: qemu_eip=%s emu_eip=%s\n",
-		// 	QemuRegSet[i].Eip, EmuRegSet[i].Eip)
+				QemuRegSet[i].Eip, EmuRegSet[i].Eip)
+			// } else {
+			// 	fmt.Printf("correct eip: qemu_eip=%s emu_eip=%s\n",
+			// 	QemuRegSet[i].Eip, EmuRegSet[i].Eip)
 		}
 		// if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
 		// 	t.Fatalf("bad eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",

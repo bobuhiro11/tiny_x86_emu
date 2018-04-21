@@ -54,7 +54,7 @@ func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 	ef.setVal(SignFlag, signr != 0)
 	// ef.setVal(OverflowFlag, sign1 != sign2 && sign1 != signr)
 	ef.setVal(OverflowFlag,
-		(sign1 == 0 && sign2 ==1 && signr == 1) || (sign1 == 1 && sign2 == 0 && signr == 0))
+	(sign1 == 0 && sign2 ==1 && signr == 1) || (sign1 == 1 && sign2 == 0 && signr == 0))
 }
 
 func (ef *Eflags) updatePF(result uint8) {

@@ -46,54 +46,54 @@ const (
 
 // segment register
 const (
-	ES=0
-	CS=1
-	SS=2
-	DS=3
-	GS=5
+	ES = 0
+	CS = 1
+	SS = 2
+	DS = 3
+	GS = 5
 )
 
 // Controll Register
 const (
-	CR4PageSizeExtension=0x10
-	CR0PagingFlag=0x1<<31
+	CR4PageSizeExtension = 0x10
+	CR0PagingFlag        = 0x1 << 31
 )
 
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
-	registers   [8]uint32  // general registers
-	cr          [16]uint32 // controll registers
-	sreg        [6]uint32  // segment registers
-	eflags      Eflags     // eflags
-	gdtrSize	uint16     // global table descriptor table's size
-	gdtrBase	uint32     // global table descriptor table's base phys address
-	memory      map[uint32]uint8    // physical memory
-	eip         uint32     // program counter
-	isSilent    bool       // silent mode
-	reader      io.Reader
-	writer      io.Writer
-	io			IO
-	operandSizeOverride bool  // true if operand size override (0x66) is enabled
-	genuineProtectedEnable bool // procted mode is refreshed only when sreg is changed
-	disasm      map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
+	registers              [8]uint32        // general registers
+	cr                     [16]uint32       // controll registers
+	sreg                   [6]uint32        // segment registers
+	eflags                 Eflags           // eflags
+	gdtrSize               uint16           // global table descriptor table's size
+	gdtrBase               uint32           // global table descriptor table's base phys address
+	memory                 map[uint32]uint8 // physical memory
+	eip                    uint32           // program counter
+	isSilent               bool             // silent mode
+	reader                 io.Reader
+	writer                 io.Writer
+	io                     IO
+	operandSizeOverride    bool              // true if operand size override (0x66) is enabled
+	genuineProtectedEnable bool              // procted mode is refreshed only when sreg is changed
+	disasm                 map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
 // NewEmulator creates New Emulator
 func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
-		e := &Emulator{
+	e := &Emulator{
 		// memory:      make([]uint8, memorySize * 2),
-		memory:      map[uint32]uint8{},
-		eip:         eip,
-		isSilent:    isSilent,
-		reader:      reader,
-		writer:      writer,
-		disasm:      disasm,
+		memory:   map[uint32]uint8{},
+		eip:      eip,
+		isSilent: isSilent,
+		reader:   reader,
+		writer:   writer,
+		disasm:   disasm,
 	}
 	e.registers[EAX] = 0xaa55
 	e.registers[ESP] = esp
 	e.cr[0] = 0x10
 	e.io = NewIO(&reader, &writer)
-	if protectedMode{
+	if protectedMode {
 		e.cr[0] |= 1
 		e.genuineProtectedEnable = true
 	}
@@ -119,7 +119,7 @@ func (e *Emulator) execInst() error {
 	case 0x0F:
 		e.code0f()
 	case 0x25:
-		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.andEaxImm32()
 		} else {
 			e.andAxImm16()
@@ -127,7 +127,7 @@ func (e *Emulator) execInst() error {
 	case 0x29:
 		e.subRm32R32()
 	case 0x31:
-		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.xorRm32R32()
 		} else {
 			e.xorRm16R16()
@@ -154,7 +154,7 @@ func (e *Emulator) execInst() error {
 		e.execInst()
 		e.operandSizeOverride = false
 	case 0x68:
-		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.pushImm32()
 		} else {
 			e.pushImm16()
@@ -214,7 +214,7 @@ func (e *Emulator) execInst() error {
 	case 0xA8:
 		e.testAlImm8()
 	case 0xA9:
-		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.testEaxImm32()
 		} else {
 			e.testAxImm16()
@@ -252,13 +252,13 @@ func (e *Emulator) execInst() error {
 	case 0xE6:
 		e.outAlImm8()
 	case 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
-		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.movR32Imm32()
 		} else {
 			e.movR16Imm16()
 		}
 	case 0xE8:
-		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (! e.genuineProtectedEnable && e.operandSizeOverride) {
+		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.callRel32()
 		} else {
 			e.callRel16()
@@ -348,9 +348,9 @@ func (e *Emulator) code0f() {
 		m := e.parseModRM()
 		address := uint32(e.calcMemoryAddress16(m))
 		e.gdtrSize = e.getMemory16(address)
-		e.gdtrBase = e.getMemory32(address+2)
+		e.gdtrBase = e.getMemory32(address + 2)
 		fmt.Printf("address=0x%x gdtrSize=0x%x gdtrBase=0x%x\n",
-		address, e.gdtrSize, e.gdtrBase)
+			address, e.gdtrSize, e.gdtrBase)
 		e.dumpGDTEntry(e.gdtrBase)
 		e.dumpGDTEntry(e.gdtrBase + 8)
 		e.dumpGDTEntry(e.gdtrBase + 16)
@@ -364,20 +364,20 @@ func (e *Emulator) code0f() {
 		m := e.parseModRM()
 		// e.cr[m.opecode] = e.getR32(m)
 		e.cr[m.opecode] = e.getRm32(m)
-		// fmt.Printf("%d %d\n", m.opecode, e.cr[m.opecode]) 
-		if m.opecode == 4 && e.cr[m.opecode] & CR4PageSizeExtension != 0{
+		// fmt.Printf("%d %d\n", m.opecode, e.cr[m.opecode])
+		if m.opecode == 4 && e.cr[m.opecode]&CR4PageSizeExtension != 0 {
 			fmt.Printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
 		} else if m.opecode == 3 {
-			fmt.Printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode] >> 12)
+			fmt.Printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode]>>12)
 			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
-				0, e.getMemory32((e.cr[m.opecode]>>22) + 4 * 0 ))
+				0, e.getMemory32((e.cr[m.opecode]>>22)+4*0))
 			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
-				512, e.getMemory32((e.cr[m.opecode]>>22) + 4 * 512 ))
-		} else if m.opecode == 0 && e.cr[m.opecode] & CR0PagingFlag != 0{
+				512, e.getMemory32((e.cr[m.opecode]>>22)+4*512))
+		} else if m.opecode == 0 && e.cr[m.opecode]&CR0PagingFlag != 0 {
 			fmt.Printf("CR0 paging is Enabled.\n")
 		}
 	}
-	MovzxR32Rm8:= func() {
+	MovzxR32Rm8 := func() {
 		m := e.parseModRM()
 		e.setRegister32(m.opecode, uint32(e.getMemory8(m.disp32)))
 	}
@@ -388,7 +388,7 @@ func (e *Emulator) code0f() {
 	}
 
 	second := e.getCode8(1)
-	e.eip+=2
+	e.eip += 2
 	if second == 0x01 {
 		lgdt()
 	} else if second == 0x20 {
@@ -400,7 +400,7 @@ func (e *Emulator) code0f() {
 	} else if second == 0xB7 {
 		MovzxR32Rm16()
 	} else {
-		panic(fmt.Sprintf("0x0F 0x%x is not implemented\n",second))
+		panic(fmt.Sprintf("0x0F 0x%x is not implemented\n", second))
 	}
 }
 
@@ -421,7 +421,7 @@ func (e *Emulator) outAlImm8() {
 	address := uint16(e.getCode8(1))
 	value := e.getRegister8(AL)
 	e.io.out8(address, value)
-	e.eip+=2
+	e.eip += 2
 }
 
 func (e *Emulator) inAlImm8() {
@@ -483,7 +483,7 @@ func (e *Emulator) orEaxImm32() {
 }
 
 func (e *Emulator) addEaxImm32() {
-value := e.getCode32(1) + e.getRegister32(EAX)
+	value := e.getCode32(1) + e.getRegister32(EAX)
 	e.setRegister32(EAX, value)
 	e.eip += 5
 }
@@ -492,7 +492,7 @@ func (e *Emulator) code81() {
 	addRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
-		e.eip+=4
+		e.eip += 4
 		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) + uint64(imm32)
 		e.setRm32(m, uint32(result))
@@ -500,7 +500,7 @@ func (e *Emulator) code81() {
 	andRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
-		e.eip+=4
+		e.eip += 4
 		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) & uint64(imm32)
 		e.setRm32(m, uint32(result))
@@ -508,7 +508,7 @@ func (e *Emulator) code81() {
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
-		e.eip+=4
+		e.eip += 4
 		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) - uint64(imm32)
 		e.eflags.updateBySub(rm32, imm32, result)
@@ -517,9 +517,9 @@ func (e *Emulator) code81() {
 
 	e.eip++
 	m := e.parseModRM()
-	
-	if (e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
-		e.genuineProtectedEnable == true && e.operandSizeOverride == true) {
+
+	if e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+		e.genuineProtectedEnable == true && e.operandSizeOverride == true {
 		panic("16bit mode is not implemented")
 	}
 
@@ -554,13 +554,13 @@ func (e *Emulator) code83() {
 		rm32 := e.getRm32(m)
 		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
-		e.setRm32(m, rm32 & uint32(imm8))
+		e.setRm32(m, rm32&uint32(imm8))
 	}
 	orRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm8 := uint32(e.getSignCode8(0))
 		e.eip++
-		e.setRm32(m, rm32 | uint32(imm8))
+		e.setRm32(m, rm32|uint32(imm8))
 	}
 	cmpRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
@@ -571,9 +571,9 @@ func (e *Emulator) code83() {
 	}
 	e.eip++
 	m := e.parseModRM()
-	
-	if (e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
-		e.genuineProtectedEnable == true && e.operandSizeOverride == true) {
+
+	if e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+		e.genuineProtectedEnable == true && e.operandSizeOverride == true {
 		panic("16bit mode is not implemented")
 	}
 
@@ -581,9 +581,9 @@ func (e *Emulator) code83() {
 	case 0:
 		addRm32Imm8(e, m)
 	case 1:
-		orRm32Imm8(e,m)
+		orRm32Imm8(e, m)
 	case 4:
-		andRm32Imm8(e,m)
+		andRm32Imm8(e, m)
 	case 5:
 		subRm32Imm8(e, m)
 	case 7:
@@ -601,7 +601,7 @@ func (e *Emulator) codeC1() {
 		rm32 := e.getRm32(m)
 		imm8 := uint32(e.getCode8(0))
 		e.eip++
-		e.setRm32(m, rm32 >> imm8)
+		e.setRm32(m, rm32>>imm8)
 		// TODO: change elfags
 	}
 
@@ -609,15 +609,15 @@ func (e *Emulator) codeC1() {
 		rm32 := e.getRm32(m)
 		imm8 := uint32(e.getCode8(0))
 		e.eip++
-		e.setRm32(m, rm32 << imm8)
+		e.setRm32(m, rm32<<imm8)
 		// TODO: change elfags
 	}
 
 	switch m.opecode {
 	case 4:
-		shlRm32Imm8(e,m)
+		shlRm32Imm8(e, m)
 	case 5:
-		shrRm32Imm8(e,m)
+		shrRm32Imm8(e, m)
 	default:
 		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented at codeC1")
 	}
@@ -701,7 +701,7 @@ func (e *Emulator) subRm32R32() {
 	m := e.parseModRM()
 	rm32 := e.getRm32(m)
 	r32 := e.getR32(m)
-	fmt.Printf("rm32=0x%x r32=0x%x\n",rm32,r32)
+	fmt.Printf("rm32=0x%x r32=0x%x\n", rm32, r32)
 	e.setRm32(m, rm32-r32)
 }
 
@@ -710,7 +710,7 @@ func (e *Emulator) orRm32R32() {
 	m := e.parseModRM()
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
-	e.setRm32(m, r32 | rm32)
+	e.setRm32(m, r32|rm32)
 }
 
 func (e *Emulator) addRm32R32() {
@@ -726,7 +726,7 @@ func (e *Emulator) orR32Rm32() {
 	m := e.parseModRM()
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
-	e.setR32(m, r32 | rm32)
+	e.setR32(m, r32|rm32)
 }
 
 func (e *Emulator) addR32Rm32() {
@@ -782,7 +782,8 @@ func (e *Emulator) cmpR32Rm32() {
 	e.eflags.updateBySub(r32, rm32, result)
 }
 
-func (e *Emulator) cmpRm32R32() { e.eip++
+func (e *Emulator) cmpRm32R32() {
+	e.eip++
 	m := e.parseModRM()
 	r32 := e.getR32(m)
 	rm32 := e.getRm32(m)
@@ -1135,11 +1136,11 @@ func (e *Emulator) outAlDx() {
 // dump GDT entry
 func (e *Emulator) dumpGDTEntry(physAddr uint32) {
 	entry := e.getMemory64(physAddr)
-	segmentBaseAddr := uint32((((entry >> 56)&0xFF)<<24) | (((entry >>32) & 0xFF)<<16) | ((entry>>16) & 0xFFFF))
-	segmentLimit := uint32((((entry>>48)&0xF) <<16) | (entry & 0xFFFF))
-	isCodeSegment := (entry>>43) & 1
+	segmentBaseAddr := uint32((((entry >> 56) & 0xFF) << 24) | (((entry >> 32) & 0xFF) << 16) | ((entry >> 16) & 0xFFFF))
+	segmentLimit := uint32((((entry >> 48) & 0xF) << 16) | (entry & 0xFFFF))
+	isCodeSegment := (entry >> 43) & 1
 	fmt.Printf("GDTEntry[%d]={entryPhysAddr=0x%x segmentBaseAddr=0x%x segmentLimit=0x%x isCodeSegment=0x%x}\n",
-	(physAddr-e.gdtrBase)/8,physAddr, segmentBaseAddr,segmentLimit,isCodeSegment)
+		(physAddr-e.gdtrBase)/8, physAddr, segmentBaseAddr, segmentLimit, isCodeSegment)
 }
 
 func (e *Emulator) setRm32(m ModRM, value uint32) {
@@ -1266,7 +1267,6 @@ func (e *Emulator) calcMemoryAddress16(m ModRM) uint16 {
 	panic("ModRM mod = 4 is not implemented")
 }
 
-
 func (e *Emulator) calcMemoryAddress32(m ModRM) uint32 {
 	if m.mod == 0 {
 		// [register + resiger]
@@ -1353,13 +1353,13 @@ func (e *Emulator) decRegister32(rm uint8, value uint32) {
 
 func (e *Emulator) v2p(vaddress uint32) uint32 {
 	var paddress uint32
-	if (e.cr[0] & CR0PagingFlag != 0) && (e.cr[4] & CR4PageSizeExtension != 0) {
+	if (e.cr[0]&CR0PagingFlag != 0) && (e.cr[4]&CR4PageSizeExtension != 0) {
 		// paing
 		var pdtEntry uint32
 		for i := uint32(0); i < 4; i++ {
-			pdtEntry |= uint32(e.memory[e.cr[3] + 4 * (vaddress >> 22) +i]) << uint32(i*8)
+			pdtEntry |= uint32(e.memory[e.cr[3]+4*(vaddress>>22)+i]) << uint32(i*8)
 		}
-		paddress = pdtEntry + vaddress & 0x3FFFFF
+		paddress = pdtEntry + vaddress&0x3FFFFF
 	} else {
 		paddress = vaddress
 	}
@@ -1527,16 +1527,16 @@ func (e *Emulator) getSingedCode16(index int32) int16 {
 
 // ModRM parameter
 type ModRM struct {
-	mod     uint8
-	opecode uint8    // This can be regarded as regIndex.
-	rm      uint8
-	disp32  uint32   // This can be regarded as (disp8, signed int8, disp16 signed int16).
-	sib     uint8    // sib byte
+	mod       uint8
+	opecode   uint8 // This can be regarded as regIndex.
+	rm        uint8
+	disp32    uint32 // This can be regarded as (disp8, signed int8, disp16 signed int16).
+	sib       uint8  // sib byte
 	disp32Sib uint32 // disp32 for sib
 }
 
 func (m *ModRM) getSib(e *Emulator) uint32 {
-	if m.mod <3 && m.rm==4 {
+	if m.mod < 3 && m.rm == 4 {
 		base := uint8(m.sib & 0x7)
 		index := uint8((m.sib >> 3) & 0x7)
 		scale := uint8((m.sib >> 6) & 0x3)
@@ -1557,7 +1557,7 @@ func (m *ModRM) getSib(e *Emulator) uint32 {
 			result += e.getRegister32(index) * uint32(1<<scale)
 		}
 
-		fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib,base,index,scale,result)
+		fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib, base, index, scale, result)
 		return result
 	}
 	return uint32(0)
@@ -1610,12 +1610,12 @@ func (e *Emulator) parseModRM() ModRM {
 		if m.mod != 3 && m.rm == 4 {
 			m.sib = e.getCode8(0)
 			e.eip++
-			if m.mod == 2 || (m.mod == 0 && (m.sib & 0x7 == 5)) {
+			if m.mod == 2 || (m.mod == 0 && (m.sib&0x7 == 5)) {
 				m.disp32Sib = e.getCode32(0)
 				e.eip += 4
 			} else if m.mod == 1 {
 				m.disp32Sib = uint32(e.getCode8(0))
-				e.eip ++
+				e.eip++
 			}
 			fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
 		}

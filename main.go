@@ -55,8 +55,8 @@ func main() {
 		os.Exit(1)
 	}
 	// disasm binary
-	exec.Command("sh", "-c", "head -c 49  " + *filename+ " | ndisasm -b 16 -o 0x7c00 - |  tee disasm16.txt").Run() // 16 bit mode
-	exec.Command("sh", "-c", "tail -c +50 " + *filename+ " | ndisasm -b 32 -o 0x7c31 - | head -n 5000 | tee disasm32.txt").Run() // 32 bit mode
+	exec.Command("sh", "-c", "head -c 49  "+*filename+" | ndisasm -b 16 -o 0x7c00 - |  tee disasm16.txt").Run()               // 16 bit mode
+	exec.Command("sh", "-c", "tail -c +50 "+*filename+" | ndisasm -b 32 -o 0x7c31 - | head -n 5000 | tee disasm32.txt").Run() // 32 bit mode
 	b, err := exec.Command("sh", "-c", "cat disasm16.txt disasm32.txt").CombinedOutput()
 	disasm := map[uint64]string{}
 	if err != nil {
@@ -84,7 +84,7 @@ func main() {
 			panic(err)
 		}
 		disasm[ix] = line[10:]
-		disasm[ix - 0x80000000] = line[10:]
+		disasm[ix-0x80000000] = line[10:]
 	}
 
 	bytes, err := LoadFile(*filename)
@@ -101,32 +101,32 @@ func main() {
 	for i := 0; i < len(bytes); i++ {
 		e.memory[uint32(i+0x7c00)] = bytes[i]
 	}
-	e.io.hdds[0],_ = os.Open(*filename)
+	e.io.hdds[0], _ = os.Open(*filename)
 
 	// emulate
 	// chFinished := make(chan bool)
 	// go func(chFinished chan bool) {
-		// time.Sleep(3000 * time.Millisecond)
-		// for e.eip < 0x7c00+0x200000 {
-		for {
-			if !*silent {
-				e.dump()
-			}
-			err := e.execInst()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
-				os.Exit(1)
-			}
-
-			if e.eip == 0 || e.eip == 0x7c00 {
-				break
-			}
-		}
+	// time.Sleep(3000 * time.Millisecond)
+	// for e.eip < 0x7c00+0x200000 {
+	for {
 		if !*silent {
 			e.dump()
 		}
-		fmt.Println("End of program")
-		// chFinished <- true
+		err := e.execInst()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+
+		if e.eip == 0 || e.eip == 0x7c00 {
+			break
+		}
+	}
+	if !*silent {
+		e.dump()
+	}
+	fmt.Println("End of program")
+	// chFinished <- true
 	// }(chFinished)
 
 	// setup gui
