@@ -139,7 +139,8 @@ func TestHello(t *testing.T) {
 	QemuRegSet := ExecQemu()
 	EmuRegSet := ExecEmu()
 	if len(QemuRegSet) != NumStep || len(EmuRegSet) != NumStep {
-		t.Fatalf("len(QemuRegSet) != len(EmuRegSet)\n")
+		t.Fatalf("len(QemuRegSet)=%d len(EmuRegSet)=%d NumStep=%d\n",
+			len(QemuRegSet), len(EmuRegSet), NumStep)
 	}
 
 	for i := 0; i < NumStep; i++ {
