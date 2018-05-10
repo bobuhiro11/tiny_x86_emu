@@ -38,6 +38,10 @@ build:
         code: |
           make build
     - script:
+        name: make qemu
+        code: |
+          make -C ./xv6-public qemu
+    - script:
         name: go test
         code: |
           make test
