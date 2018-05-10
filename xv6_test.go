@@ -108,7 +108,7 @@ func ExecQemu() []RegisterSet {
 	s, _ := exec.Command("sh", "-c", "ps -aux | grep qemu").Output()
 	fmt.Printf("ps result=%s\n", s)
 
-	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath).Output()
+	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath).CombinedOutput()
 	// gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath+` 2>/dev/null | grep \
 	// -e "eax\s*0x" \
 	// -e "ecx\s*0x" \
