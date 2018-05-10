@@ -108,26 +108,25 @@ func ExecQemu() []RegisterSet {
 	s, _ := exec.Command("sh", "-c", "ps -aux | grep qemu").Output()
 	fmt.Printf("ps result=%s\n", s)
 
-	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath).CombinedOutput()
-	// gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath+` 2>/dev/null | grep \
-	// -e "eax\s*0x" \
-	// -e "ecx\s*0x" \
-	// -e "edx\s*0x" \
-	// -e "ebx\s*0x" \
-	// -e "esp\s*0x" \
-	// -e "ebp\s*0x" \
-	// -e "esi\s*0x" \
-	// -e "edi\s*0x" \
-	// -e "eip\s*0x" \
-	// -e "eflags\s*0x" \
-	// -e "cs\s*0x" \
-	// -e "ss\s*0x" \
-	// -e "ds\s*0x" \
-	// -e "es\s*0x" \
-	// -e "fs\s*0x" \
-	// -e "gs\s*0x" \
-	// | awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
-	// `).Output()
+	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath+` 2>/dev/null | grep \
+	-e "eax\s*0x" \
+	-e "ecx\s*0x" \
+	-e "edx\s*0x" \
+	-e "ebx\s*0x" \
+	-e "esp\s*0x" \
+	-e "ebp\s*0x" \
+	-e "esi\s*0x" \
+	-e "edi\s*0x" \
+	-e "eip\s*0x" \
+	-e "eflags\s*0x" \
+	-e "cs\s*0x" \
+	-e "ss\s*0x" \
+	-e "ds\s*0x" \
+	-e "es\s*0x" \
+	-e "fs\s*0x" \
+	-e "gs\s*0x" \
+	| awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
+	`).Output()
 	fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
 	var res []RegisterSet
