@@ -1,5 +1,5 @@
 rebuild: clean build
-build:
+build: xv6
 	go build
 test: guest_bin xv6
 	pkgs=$(go list ./... | grep -v /vendor/)
