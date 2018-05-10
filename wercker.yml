@@ -38,9 +38,9 @@ build:
         code: |
           make build
     - script:
-        name: make qemu
+        name: qemu
         code: |
-          make -C ./xv6-public qemu
+          cd ./xv6-public && qemu-system-i386 -serial mon:stdio -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp 2 -m 512 -nographic
     - script:
         name: go test
         code: |
