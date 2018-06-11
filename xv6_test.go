@@ -127,7 +127,7 @@ func ExecQemu() []RegisterSet {
 	-e "gs\s*0x" \
 	| awk '{ if ($1=="eax") print "- " $1 ": " $2; else print "  " $1 ": " $2; }'
 	`).Output()
-	fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
+	// fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
 	var res []RegisterSet
 	err := yaml.Unmarshal([]byte(gdbOutput), &res)

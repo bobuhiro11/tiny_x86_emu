@@ -1593,7 +1593,7 @@ func (e *Emulator) parseModRM() ModRM {
 	}
 
 	e.eip++
-	fmt.Printf("get mod=0x%x opecode=0x%x rm=0x%x\n", m.mod, m.opecode, m.rm)
+	// fmt.Printf("get mod=0x%x opecode=0x%x rm=0x%x\n", m.mod, m.opecode, m.rm)
 
 	if e.cr[0]&1 == 0 {
 		// 16 bit mode
@@ -1617,7 +1617,7 @@ func (e *Emulator) parseModRM() ModRM {
 				m.disp32Sib = uint32(e.getCode8(0))
 				e.eip++
 			}
-			fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
+			// fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
 		}
 
 		if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
