@@ -28,6 +28,8 @@ func NewIO(reader *io.Reader, writer *io.Writer) IO {
 	}
 }
 
+var times0x01f7 = 0
+
 func (io *IO) in8(address uint16) uint8 {
 	// fmt.Printf("io.in8 from 0x%x\n", address)
 	switch address {
@@ -38,7 +40,12 @@ func (io *IO) in8(address uint16) uint8 {
 		io.hdds[0].Read(b)
 		io.memory[address] = b[0]
 	case 0x01f7: // 1st Hark Disk Status (4th bit means drive ready)
-		io.memory[address] = 0x40
+		if times0x01f7 == 0 {
+			io.memory[address] = 0x50
+		} else {
+			io.memory[address] = 0x41
+		}
+		times0x01f7++
 	case 0x03f8: // Reciever Buffer Register
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')

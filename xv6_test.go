@@ -153,13 +153,18 @@ func TestXv6(t *testing.T) {
 	}
 
 	for i := 0; i < NumStep; i++ {
-		t.Logf("[qemu #%d] eip=%s ecx=%s\n", i, QemuRegSet[i].Eip, QemuRegSet[i].Ecx)
-		t.Logf("[tiny #%d] eip=%s ecx=%s\n", i, EmuRegSet[i].Eip, EmuRegSet[i].Ecx)
+		t.Logf("[qemu #%d] eip=%s eax=%s ecx=%s\n",
+			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx)
+		t.Logf("[tiny #%d] eip=%s eax=%s ecx=%s\n",
+			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx)
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
 			t.Fatalf("bad eip")
-			// } else {
-			// 	fmt.Printf("correct eip: qemu_eip=%s emu_eip=%s\n",
-			// 	QemuRegSet[i].Eip, EmuRegSet[i].Eip)
+		}
+		if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
+			t.Fatalf("bad eax")
+		}
+		if QemuRegSet[i].Ecx != EmuRegSet[i].Ecx {
+			t.Fatalf("bad ecx")
 		}
 		// if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
 		// 	t.Fatalf("bad eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",
