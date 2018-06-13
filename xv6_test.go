@@ -31,7 +31,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 105
+	NumStep = 1500
 )
 
 // return the path of the gdb script
@@ -86,6 +86,7 @@ func ExecEmu() []RegisterSet {
 		}
 		regSet := RegisterSet{
 			Eax: fmt.Sprintf("0x%x", e.getRegister32(EAX)),
+			Ecx: fmt.Sprintf("0x%x", e.getRegister32(ECX)),
 			Eip: fmt.Sprintf("0x%x", e.eip),
 		}
 		res = append(res, regSet)
@@ -105,8 +106,8 @@ func ExecQemu() []RegisterSet {
 	}()
 	fmt.Printf("qemu pid=%d\n", qemuCmd.Process.Pid)
 
-	s, _ := exec.Command("sh", "-c", "ps -aux | grep qemu").Output()
-	fmt.Printf("ps result=%s\n", s)
+	exec.Command("sh", "-c", "ps -aux | grep qemu").Output()
+	// fmt.Printf("ps result=%s\n", s)
 
 	gdbOutput, _ := exec.Command("sh", "-c", "gdb -x "+gdbScriptPath+` 2>/dev/null | grep \
 	-e "eax\s*0x" \
@@ -129,6 +130,11 @@ func ExecQemu() []RegisterSet {
 	`).Output()
 	// fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
+	file, _ := os.Create(`qemu.log`)
+	defer file.Close()
+
+	file.Write(([]byte)(gdbOutput))
+
 	var res []RegisterSet
 	err := yaml.Unmarshal([]byte(gdbOutput), &res)
 	if err != nil {
@@ -138,7 +144,7 @@ func ExecQemu() []RegisterSet {
 	return res
 }
 
-func TestHello(t *testing.T) {
+func TestXv6(t *testing.T) {
 	QemuRegSet := ExecQemu()
 	EmuRegSet := ExecEmu()
 	if len(QemuRegSet) != NumStep || len(EmuRegSet) != NumStep {
@@ -147,9 +153,10 @@ func TestHello(t *testing.T) {
 	}
 
 	for i := 0; i < NumStep; i++ {
+		t.Logf("[qemu #%d] eip=%s ecx=%s\n", i, QemuRegSet[i].Eip, QemuRegSet[i].Ecx)
+		t.Logf("[tiny #%d] eip=%s ecx=%s\n", i, EmuRegSet[i].Eip, EmuRegSet[i].Ecx)
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
-			t.Fatalf("bad eip: qemu_eip=%s emu_eip=%s\n",
-				QemuRegSet[i].Eip, EmuRegSet[i].Eip)
+			t.Fatalf("bad eip")
 			// } else {
 			// 	fmt.Printf("correct eip: qemu_eip=%s emu_eip=%s\n",
 			// 	QemuRegSet[i].Eip, EmuRegSet[i].Eip)

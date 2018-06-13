@@ -274,11 +274,17 @@ func (e *Emulator) execInst() error {
 	case 0xF3:
 		// rep prefix
 		fmt.Printf("repeat %d times.\n", e.getRegister32(ECX))
-		eip := e.eip + 1
-		for e.getRegister32(ECX) > 0 {
-			e.eip = eip
+		if e.getRegister32(ECX) > 1 {
+			e.eip++
 			e.execInst()
 			e.decRegister32(ECX, 1)
+			e.eip -= 2
+		} else if e.getRegister32(ECX) == 1 {
+			e.eip++
+			e.execInst()
+			e.decRegister32(ECX, 1)
+		} else {
+			e.eip += 2
 		}
 	case 0xF4:
 		e.halt()

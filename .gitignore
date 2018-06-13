@@ -23,4 +23,5 @@ tags.lock
 
 # other
 *.swp
+qemu.log
 xv6-public
