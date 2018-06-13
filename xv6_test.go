@@ -62,7 +62,7 @@ func ExecEmu() []RegisterSet {
 	// setup emulator
 	reader := &bytes.Buffer{}
 	writer := &bytes.Buffer{}
-	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x8000, false, true, reader, writer, map[uint64]string{})
+	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, true, reader, writer, map[uint64]string{})
 
 	// load file
 	bin, err := LoadFile("./xv6-public/xv6.img")
@@ -87,6 +87,10 @@ func ExecEmu() []RegisterSet {
 		regSet := RegisterSet{
 			Eax: fmt.Sprintf("0x%x", e.getRegister32(EAX)),
 			Ecx: fmt.Sprintf("0x%x", e.getRegister32(ECX)),
+			Ebx: fmt.Sprintf("0x%x", e.getRegister32(EBX)),
+			Edx: fmt.Sprintf("0x%x", e.getRegister32(EDX)),
+			Esp: fmt.Sprintf("0x%x", e.getRegister32(ESP)),
+			Ebp: fmt.Sprintf("0x%x", e.getRegister32(EBP)),
 			Eip: fmt.Sprintf("0x%x", e.eip),
 		}
 		res = append(res, regSet)
@@ -153,10 +157,10 @@ func TestXv6(t *testing.T) {
 	}
 
 	for i := 0; i < NumStep; i++ {
-		t.Logf("[qemu #%d] eip=%s eax=%s ecx=%s\n",
-			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx)
-		t.Logf("[tiny #%d] eip=%s eax=%s ecx=%s\n",
-			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx)
+		t.Logf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s\n",
+			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx, QemuRegSet[i].Esp)
+		t.Logf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s\n",
+			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx, EmuRegSet[i].Esp)
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
 			t.Fatalf("bad eip")
 		}
@@ -165,6 +169,15 @@ func TestXv6(t *testing.T) {
 		}
 		if QemuRegSet[i].Ecx != EmuRegSet[i].Ecx {
 			t.Fatalf("bad ecx")
+		}
+		if QemuRegSet[i].Ebx != EmuRegSet[i].Ebx {
+			t.Fatalf("bad ebx")
+		}
+		if QemuRegSet[i].Esp != EmuRegSet[i].Esp {
+			t.Fatalf("bad esp")
+		}
+		if QemuRegSet[i].Ebp != EmuRegSet[i].Ebp {
+			t.Fatalf("bad ebp")
 		}
 		// if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
 		// 	t.Fatalf("bad eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",
