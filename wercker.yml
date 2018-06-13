@@ -11,6 +11,15 @@ build:
           wget https://dl.google.com/go/go1.10.linux-amd64.tar.gz
           sudo tar -C /usr/local -zxf go1.10.linux-amd64.tar.gz
     - script:
+        name: install unicorn
+        code: |
+             wget https://github.com/unicorn-engine/unicorn/archive/master.zip
+             unzip master.zip
+             pushd unicorn-master/
+             ./make.sh
+             sudo ./make.sh install
+             popd
+    - script:
         name: check dependencies
         code: |
           go version
@@ -26,6 +35,7 @@ build:
           go get -u -v github.com/goreleaser/goreleaser
           go get -u -v github.com/golang/dep/...
           go get -u -v github.com/golang/lint/golint
+          go get -u -v github.com/unicorn-engine/unicorn/bindings/go
           # glfw cannot be managed by dep
           go get -u -v github.com/go-gl/glfw/v3.2/glfw/...
           go get -u -v github.com/go-gl/gl/v2.1/gl/...
