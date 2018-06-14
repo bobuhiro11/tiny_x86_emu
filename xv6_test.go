@@ -91,6 +91,8 @@ func ExecEmu() []RegisterSet {
 			Edx: fmt.Sprintf("0x%x", e.getRegister32(EDX)),
 			Esp: fmt.Sprintf("0x%x", e.getRegister32(ESP)),
 			Ebp: fmt.Sprintf("0x%x", e.getRegister32(EBP)),
+			Esi: fmt.Sprintf("0x%x", e.getRegister32(ESI)),
+			Edi: fmt.Sprintf("0x%x", e.getRegister32(EDI)),
 			Eip: fmt.Sprintf("0x%x", e.eip),
 		}
 		res = append(res, regSet)
@@ -157,27 +159,30 @@ func TestXv6(t *testing.T) {
 	}
 
 	for i := 0; i < NumStep; i++ {
-		t.Logf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s\n",
-			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx, QemuRegSet[i].Esp)
-		t.Logf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s\n",
-			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx, EmuRegSet[i].Esp)
+		t.Logf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
+			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx, QemuRegSet[i].Esp,
+			QemuRegSet[i].Edx, QemuRegSet[i].Esi)
+		t.Logf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
+			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx, EmuRegSet[i].Esp,
+			EmuRegSet[i].Edx, EmuRegSet[i].Esi)
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
 			t.Fatalf("bad eip")
-		}
-		if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
+		} else if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
 			t.Fatalf("bad eax")
-		}
-		if QemuRegSet[i].Ecx != EmuRegSet[i].Ecx {
+		} else if QemuRegSet[i].Ecx != EmuRegSet[i].Ecx {
 			t.Fatalf("bad ecx")
-		}
-		if QemuRegSet[i].Ebx != EmuRegSet[i].Ebx {
+		} else if QemuRegSet[i].Edx != EmuRegSet[i].Edx {
+			t.Fatalf("bad edx")
+		} else if QemuRegSet[i].Ebx != EmuRegSet[i].Ebx {
 			t.Fatalf("bad ebx")
-		}
-		if QemuRegSet[i].Esp != EmuRegSet[i].Esp {
+		} else if QemuRegSet[i].Esp != EmuRegSet[i].Esp {
 			t.Fatalf("bad esp")
-		}
-		if QemuRegSet[i].Ebp != EmuRegSet[i].Ebp {
+		} else if QemuRegSet[i].Ebp != EmuRegSet[i].Ebp {
 			t.Fatalf("bad ebp")
+		} else if QemuRegSet[i].Esi != EmuRegSet[i].Esi {
+			t.Fatalf("bad esi")
+		} else if QemuRegSet[i].Edi != EmuRegSet[i].Edi {
+			t.Fatalf("bad edi")
 		}
 		// if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
 		// 	t.Fatalf("bad eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",

@@ -90,6 +90,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 		disasm:   disasm,
 	}
 	e.registers[EAX] = 0xaa55
+	e.registers[EDX] = 0x80
 	e.registers[ESP] = esp
 	e.cr[0] = 0x10
 	e.io = NewIO(&reader, &writer)
