@@ -31,7 +31,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 5500
+	NumStep = 10000
 )
 
 // return the path of the gdb script
@@ -73,6 +73,7 @@ func ExecEmu() []RegisterSet {
 	for i := 0; i < len(bin); i++ {
 		e.memory[uint32(i+0x7c00)] = bin[i]
 	}
+	e.io.hdds[0], _ = os.Open("./xv6-public/xv6.img")
 
 	// main loop
 	var res []RegisterSet
@@ -104,7 +105,9 @@ func ExecEmu() []RegisterSet {
 func ExecQemu() []RegisterSet {
 	gdbScriptPath := MakeGdbScript()
 
-	qemuCmd := exec.Command("qemu-system-i386", "-hdb", "./xv6-public/xv6.img", "-S", "-gdb", "tcp::1234", "-nographic")
+	qemuCmd := exec.Command("qemu-system-i386",
+		"-drive", "file=./xv6-public/fs.img,index=1,media=disk,format=raw", "-drive", "file=./xv6-public/xv6.img,index=0,media=disk,format=raw", "-smp", "2", "-m", "512",
+		"-S", "-gdb", "tcp::1234", "-nographic")
 	qemuCmd.Start()
 	defer func() {
 		qemuCmd.Process.Kill()
@@ -159,10 +162,10 @@ func TestXv6(t *testing.T) {
 	}
 
 	for i := 0; i < NumStep; i++ {
-		t.Logf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
+		fmt.Printf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
 			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx, QemuRegSet[i].Esp,
 			QemuRegSet[i].Edx, QemuRegSet[i].Esi)
-		t.Logf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
+		fmt.Printf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
 			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx, EmuRegSet[i].Esp,
 			EmuRegSet[i].Edx, EmuRegSet[i].Esi)
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {

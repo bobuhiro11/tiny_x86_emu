@@ -335,8 +335,8 @@ func (e *Emulator) insd() {
 	ioAddress := e.getRegister16(DX)
 	value := e.io.in32(ioAddress)
 	memAddress := e.getRegister32(EDI)
-	// fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
-	// 	value, ioAddress, memAddress, e.v2p(memAddress))
+	fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
+		value, ioAddress, memAddress, e.v2p(memAddress))
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
 	e.eip++
@@ -517,8 +517,8 @@ func (e *Emulator) code81() {
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
+		fmt.Printf("eip=%x rm32 value=0x%x imm32 value=0x%x\n", e.eip, rm32, imm32)
 		e.eip += 4
-		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) - uint64(imm32)
 		e.eflags.updateBySub(rm32, imm32, result)
 		// e.setRm32(m, uint32(result))
@@ -1400,6 +1400,7 @@ func (e *Emulator) setMemory32(address, value uint32) {
 
 // TODO: consider linear address transformation using DS
 func (e *Emulator) getMemory8(address uint32) uint8 {
+	// fmt.Printf("vaddr=%x paddr=%x\n", address, e.v2p(address))
 	return e.memory[e.v2p(address)]
 }
 

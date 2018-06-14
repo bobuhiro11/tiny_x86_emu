@@ -31,7 +31,7 @@ func NewIO(reader *io.Reader, writer *io.Writer) IO {
 var times0x01f7 = 0
 
 func (io *IO) in8(address uint16) uint8 {
-	// fmt.Printf("io.in8 from 0x%x\n", address)
+	//fmt.Printf("io.in8 from 0x%x\n", address)
 	switch address {
 	case 0x0064: // Keyboard Controller Read Status
 		io.memory[address] = 0x1c
@@ -40,10 +40,10 @@ func (io *IO) in8(address uint16) uint8 {
 		io.hdds[0].Read(b)
 		io.memory[address] = b[0]
 	case 0x01f7: // 1st Hark Disk Status (4th bit means drive ready)
-		if times0x01f7 == 0 {
+		if times0x01f7&0x01 == 0 {
 			io.memory[address] = 0x50
 		} else {
-			io.memory[address] = 0x41
+			io.memory[address] = 0x58
 		}
 		times0x01f7++
 	case 0x03f8: // Reciever Buffer Register
