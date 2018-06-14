@@ -62,6 +62,11 @@ func (io *IO) in32(address uint16) uint32 {
 	return ret
 }
 
+func (io *IO) out16(address, value uint16) {
+	io.out8(address, uint8(value&0xFF))
+	io.out8(address+1, uint8((value&0xFF00)>>8))
+}
+
 func (io *IO) out8(address uint16, value uint8) {
 	fmt.Printf("io.out8 address=0x%x value=0x%x\n", address, value)
 	io.memory[address] = value

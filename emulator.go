@@ -272,9 +272,11 @@ func (e *Emulator) execInst() error {
 		e.inAlDx()
 	case 0xEE:
 		e.outAlDx()
+	case 0xEF:
+		e.outAxDx()
 	case 0xF3:
 		// rep prefix
-		fmt.Printf("repeat %d times.\n", e.getRegister32(ECX))
+		// fmt.Printf("repeat %d times.\n", e.getRegister32(ECX))
 		if e.getRegister32(ECX) > 1 {
 			e.eip++
 			e.execInst()
@@ -296,7 +298,7 @@ func (e *Emulator) execInst() error {
 	case 0xFF:
 		e.codeFf()
 	default:
-		return errors.New(fmt.Sprintf("opecode = %x", e.getCode8(0)) + " is not implemented.")
+		return errors.New(fmt.Sprintf("eip=%x opecode = %x is not implemented.", e.eip, e.getCode8(0)))
 	}
 	return nil
 }
@@ -333,8 +335,8 @@ func (e *Emulator) insd() {
 	ioAddress := e.getRegister16(DX)
 	value := e.io.in32(ioAddress)
 	memAddress := e.getRegister32(EDI)
-	fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
-		value, ioAddress, memAddress, e.v2p(memAddress))
+	// fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
+	// 	value, ioAddress, memAddress, e.v2p(memAddress))
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
 	e.eip++
@@ -1135,6 +1137,13 @@ func (e *Emulator) outAlDx() {
 	address := e.getRegister16(DX)
 	value := e.getRegister8(AL)
 	e.io.out8(address, value)
+	e.eip++
+}
+
+func (e *Emulator) outAxDx() {
+	address := e.getRegister16(DX)
+	value := e.getRegister16(AX)
+	e.io.out16(address, value)
 	e.eip++
 }
 
