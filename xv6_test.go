@@ -31,7 +31,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 70000
+	NumStep = 100000
 )
 
 // return the path of the gdb script
