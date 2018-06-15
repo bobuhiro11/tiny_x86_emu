@@ -291,6 +291,10 @@ func (e *Emulator) execInst() error {
 		}
 	case 0xF4:
 		e.halt()
+	case 0xF6:
+		e.testRm8Imm8()
+	case 0xF7:
+		e.testRm32Imm32()
 	case 0xFA:
 		e.cli()
 	case 0xFC:
@@ -324,9 +328,9 @@ func (e *Emulator) stosd() {
 	value := e.getRegister32(EAX)
 	e.setMemory32(address, value)
 	if e.eflags.isEnable(DirectionFlag) {
-		e.decRegister32(EDI, 1)
+		e.decRegister32(EDI, 4)
 	} else {
-		e.incRegister32(EDI, 1)
+		e.incRegister32(EDI, 4)
 	}
 	e.eip++
 }
@@ -388,7 +392,8 @@ func (e *Emulator) code0f() {
 	}
 	MovzxR32Rm8 := func() {
 		m := e.parseModRM()
-		e.setRegister32(m.opecode, uint32(e.getMemory8(m.disp32)))
+		// e.setRegister32(m.opecode, uint32(e.getMemory8(e.calcMemoryAddress32(m))))
+		e.setRegister32(m.opecode, uint32(e.getRm8(m)))
 	}
 	MovzxR32Rm16 := func() {
 		m := e.parseModRM()
@@ -837,6 +842,41 @@ func (e *Emulator) testRm32R32() {
 	e.eflags.updatePF(uint8(result & 0xFF))
 }
 
+func (e *Emulator) testRm32Imm32() {
+	e.eip++
+	m := e.parseModRM()
+	value := e.getCode32(0)
+	e.eip += 4
+	result := e.getRm32(m) & value
+	if result == 0 {
+		e.eflags.set(ZeroFlag)
+	} else {
+		e.eflags.unset(ZeroFlag)
+	}
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
+	e.eflags.updatePF(uint8(result & 0xFF))
+}
+
+func (e *Emulator) testRm8Imm8() {
+	e.eip++
+	m := e.parseModRM()
+	rm8 := e.getRm8(m)
+	value := e.getCode8(0)
+	e.eip++
+
+	result := uint32(rm8 & value)
+	if result == 0 {
+		e.eflags.set(ZeroFlag)
+	} else {
+		e.eflags.unset(ZeroFlag)
+	}
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
+	e.eflags.updatePF(uint8(result & 0xFF))
+}
+
+// e.setRegister32(m.opecode, uint32(e.getMemory8(m.disp32)))
 func (e *Emulator) testAxImm16() {
 	ax := uint32(e.getRegister16(AX))
 	value := uint32(e.getCode16(1))
@@ -1628,13 +1668,13 @@ func (e *Emulator) parseModRM() ModRM {
 		if m.mod != 3 && m.rm == 4 {
 			m.sib = e.getCode8(0)
 			e.eip++
-			if m.mod == 2 || (m.mod == 0 && (m.sib&0x7 == 5)) {
-				m.disp32Sib = e.getCode32(0)
-				e.eip += 4
-			} else if m.mod == 1 {
-				m.disp32Sib = uint32(e.getCode8(0))
-				e.eip++
-			}
+			// if m.mod == 2 || (m.mod == 0 && (m.sib&0x7 == 5)) {
+			// 	m.disp32Sib = e.getCode32(0)
+			// 	e.eip += 4
+			// } else if m.mod == 1 {
+			// 	m.disp32Sib = uint32(e.getCode8(0))
+			// 	e.eip++
+			// }
 			// fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
 		}
 

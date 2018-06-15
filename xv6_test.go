@@ -31,7 +31,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 30000
+	NumStep = 70000
 )
 
 // return the path of the gdb script
@@ -162,12 +162,12 @@ func TestXv6(t *testing.T) {
 	}
 
 	for i := 0; i < NumStep; i++ {
-		fmt.Printf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
+		fmt.Printf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s edi=%s ebp=%s\n",
 			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx, QemuRegSet[i].Esp,
-			QemuRegSet[i].Edx, QemuRegSet[i].Esi)
-		fmt.Printf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s esi=%s\n",
+			QemuRegSet[i].Edx, QemuRegSet[i].Edi, QemuRegSet[i].Ebp)
+		fmt.Printf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s edi=%s ebp=%s\n",
 			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx, EmuRegSet[i].Esp,
-			EmuRegSet[i].Edx, EmuRegSet[i].Esi)
+			EmuRegSet[i].Edx, EmuRegSet[i].Edi, EmuRegSet[i].Ebp)
 		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
 			t.Fatalf("bad eip")
 		} else if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
