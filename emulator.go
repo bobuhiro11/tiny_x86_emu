@@ -1373,8 +1373,9 @@ func (e *Emulator) v2p(vaddress uint32) uint32 {
 		// paing
 		var pdtEntry uint32
 		for i := uint32(0); i < 4; i++ {
-			pdtEntry |= uint32(e.memory[e.cr[3]+4*(vaddress>>22)+i]) << uint32(i*8)
+			pdtEntry |= uint32(e.memory[(e.cr[3]>>22)+4*(vaddress>>22)+i]) << uint32(i*8)
 		}
+		// fmt.Printf("pdtEntry=0x%x index=%d offset=0x%x\n", pdtEntry, vaddress>>22, vaddress&0x3FFFFF)
 		paddress = pdtEntry + vaddress&0x3FFFFF
 	} else {
 		paddress = vaddress
@@ -1465,7 +1466,7 @@ func (e *Emulator) dump() {
 		"ESI=0x%08x "+
 		"EDI=0x%08x "+
 		"EBP=0x%08x "+
-		"EIP=0x%08x ",
+		"EIP=0x%08x[paddr=0x%08x] ",
 		e.registers[EAX],
 		e.registers[ECX],
 		e.registers[EDX],
@@ -1474,7 +1475,7 @@ func (e *Emulator) dump() {
 		e.registers[ESI],
 		e.registers[EDI],
 		e.registers[EBP],
-		e.eip,
+		e.eip, e.v2p(e.eip),
 	)
 	color.New(color.FgGreen).Printf("(opecode=%02x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
