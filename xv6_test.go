@@ -33,7 +33,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 140000
+	NumStep = 800000
 	// NumStep = 2000000 // This is for qemu_xv6.log
 )
 
@@ -110,11 +110,54 @@ func ExecEmu() {
 	}
 
 	// dump to emu_xv6.log
-	content, err := yaml.Marshal(&res)
+	// content, err := yaml.Marshal(&res)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// ioutil.WriteFile("emu_xv6.log", content, os.ModePerm)
+	os.Remove("emu_xv6.log")
+	file, err := os.Create("emu_xv6.log")
 	if err != nil {
 		panic(err)
 	}
-	ioutil.WriteFile("emu_xv6.log", content, os.ModePerm)
+	defer file.Close()
+
+	for _, r := range res {
+		file.Write(([]byte)(fmt.Sprintf(
+			"- eax: %s\n"+
+				"  ecx: %s\n"+
+				"  edx: %s\n"+
+				"  ebx: %s\n"+
+				"  esp: %s\n"+
+				"  ebp: %s\n"+
+				"  esi: %s\n"+
+				"  edi: %s\n"+
+				"  eip: %s\n"+
+				"  eflags: %s\n"+
+				"  cs: %s\n"+
+				"  ss: %s\n"+
+				"  ds: %s\n"+
+				"  es: %s\n"+
+				"  fs: %s\n"+
+				"  gs: %s\n",
+			r.Eax,
+			r.Ecx,
+			r.Edx,
+			r.Ebx,
+			r.Esp,
+			r.Ebp,
+			r.Esi,
+			r.Edi,
+			r.Eip,
+			r.Eflags,
+			r.Cs,
+			r.Ss,
+			r.Ds,
+			r.Es,
+			r.Fs,
+			r.Gs,
+		)))
+	}
 }
 
 // return register values obtained from qemu and gdb

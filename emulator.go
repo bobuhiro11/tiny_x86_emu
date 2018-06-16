@@ -203,6 +203,8 @@ func (e *Emulator) execInst() error {
 		e.code83()
 	case 0x89:
 		e.movRm32R32()
+	case 0x9C:
+		e.pushf()
 	case 0x8A:
 		e.movR8Rm8()
 	case 0x8B:
@@ -366,8 +368,11 @@ func (e *Emulator) code0f() {
 		fmt.Printf("address=0x%x gdtrSize=0x%x gdtrBase=0x%x\n",
 			address, e.gdtrSize, e.gdtrBase)
 		e.dumpGDTEntry(e.gdtrBase)
-		e.dumpGDTEntry(e.gdtrBase + 8)
-		e.dumpGDTEntry(e.gdtrBase + 16)
+		e.dumpGDTEntry(e.gdtrBase + 0x8)
+		e.dumpGDTEntry(e.gdtrBase + 0x10)
+		e.dumpGDTEntry(e.gdtrBase + 0x18)
+		e.dumpGDTEntry(e.gdtrBase + 0x20)
+		e.dumpGDTEntry(e.gdtrBase + 0x28)
 	}
 	movR32Cr := func() {
 		m := e.parseModRM()
@@ -401,6 +406,10 @@ func (e *Emulator) code0f() {
 		fmt.Printf("m.disp32=0x%x\n", m.disp32)
 		e.setRegister32(m.opecode, uint32(e.getMemory16(m.disp32)))
 	}
+	jne := func() {
+		rel := e.getCode32(0)
+		e.eip += rel + 4
+	}
 
 	second := e.getCode8(1)
 	e.eip += 2
@@ -410,6 +419,8 @@ func (e *Emulator) code0f() {
 		movR32Cr()
 	} else if second == 0x22 {
 		movCrR32()
+	} else if second == 0x85 {
+		jne()
 	} else if second == 0xB6 {
 		MovzxR32Rm8()
 	} else if second == 0xB7 {
@@ -979,6 +990,11 @@ func (e *Emulator) pushR32() {
 	e.eip++
 }
 
+func (e *Emulator) pushf() {
+	e.eip++
+	e.push32(uint32(e.eflags))
+}
+
 func (e *Emulator) incR32() {
 	reg := e.getCode8(0) - 0x40
 	e.setRegister32(reg, e.getRegister32(reg)+1)
@@ -1494,9 +1510,10 @@ func (e *Emulator) leave() {
 	e.eip++
 }
 
-func (e *Emulator) dump() {
+func (e *Emulator) dump(index int) {
 	color.New(color.FgBlack).Printf("" +
-		"-------------------------------" +
+		fmt.Sprintf("%10d", index) +
+		"---------------------" +
 		"-----------------------------\n")
 	color.New(color.FgCyan).Printf(""+
 		"EAX=0x%08x "+

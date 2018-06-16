@@ -108,9 +108,10 @@ func main() {
 	// go func(chFinished chan bool) {
 	// time.Sleep(3000 * time.Millisecond)
 	// for e.eip < 0x7c00+0x200000 {
+	i := 0
 	for {
 		if !*silent {
-			e.dump()
+			e.dump(i)
 		}
 		err := e.execInst()
 		if err != nil {
@@ -121,9 +122,10 @@ func main() {
 		if e.eip == 0 || e.eip == 0x7c00 {
 			break
 		}
+		i++
 	}
 	if !*silent {
-		e.dump()
+		e.dump(i)
 	}
 	fmt.Println("End of program")
 	// chFinished <- true
