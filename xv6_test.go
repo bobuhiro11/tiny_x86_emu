@@ -185,7 +185,7 @@ func TestXv6(t *testing.T) {
 	a = time.Now()
 	fmt.Printf("Qemu Execution Time is %v\n", a.Sub(b))
 
-	command := `diff <(sed 's/"//g' emu_xv6.log | head -n ` + fmt.Sprintf("%d", NumStep*16) + `) <(head -n ` + fmt.Sprintf("%d", NumStep*16) + ` qemu_xv6.log)`
+	command := `diff <(sed 's/"//g' emu_xv6.log | head -n ` + fmt.Sprintf("%d", NumStep*16) + ` | grep -v eflags) <(head -n ` + fmt.Sprintf("%d", NumStep*16) + ` qemu_xv6.log | grep -v eflags)`
 	fmt.Printf("Diff Command is \"%s\"\n", command)
 	diffStr, _ := exec.Command("bash", "-c", command).Output()
 

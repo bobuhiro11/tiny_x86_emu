@@ -94,6 +94,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	e.registers[ESP] = esp
 	e.cr[0] = 0x10
 	e.io = NewIO(&reader, &writer)
+	e.eflags = 2
 	if protectedMode {
 		e.cr[0] |= 1
 		e.genuineProtectedEnable = true
