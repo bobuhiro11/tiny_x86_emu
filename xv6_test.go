@@ -3,14 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
+	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"testing"
-	"time"
-
-	yaml "gopkg.in/yaml.v2"
 )
 
 type RegisterSet struct {
@@ -156,16 +154,8 @@ func ExecQemu() []RegisterSet {
 }
 
 func TestXv6(t *testing.T) {
-	b := time.Now()
 	QemuRegSet := ExecQemu()
-	a := time.Now()
-	fmt.Printf("Qemu Execution Time is %v\n", a.Sub(b))
-
-	b = time.Now()
 	EmuRegSet := ExecEmu()
-	a = time.Now()
-	fmt.Printf("Emu Execution Time is %v\n", a.Sub(b))
-
 	if len(QemuRegSet) != NumStep || len(EmuRegSet) != NumStep {
 		t.Fatalf("len(QemuRegSet)=%d len(EmuRegSet)=%d NumStep=%d\n",
 			len(QemuRegSet), len(EmuRegSet), NumStep)
