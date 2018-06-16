@@ -34,6 +34,7 @@ type RegisterSet struct {
 
 const (
 	NumStep = 100000
+	// NumStep = 2000000 // This is for qemu_xv6.log
 )
 
 // return the path of the gdb script
@@ -60,7 +61,7 @@ func MakeGdbScript() string {
 }
 
 // return register values obtained from this emulator
-func ExecEmu() []RegisterSet {
+func ExecEmu() {
 	// setup emulator
 	reader := &bytes.Buffer{}
 	writer := &bytes.Buffer{}
@@ -88,23 +89,42 @@ func ExecEmu() []RegisterSet {
 			break
 		}
 		regSet := RegisterSet{
-			Eax: fmt.Sprintf("0x%x", e.getRegister32(EAX)),
-			Ecx: fmt.Sprintf("0x%x", e.getRegister32(ECX)),
-			Ebx: fmt.Sprintf("0x%x", e.getRegister32(EBX)),
-			Edx: fmt.Sprintf("0x%x", e.getRegister32(EDX)),
-			Esp: fmt.Sprintf("0x%x", e.getRegister32(ESP)),
-			Ebp: fmt.Sprintf("0x%x", e.getRegister32(EBP)),
-			Esi: fmt.Sprintf("0x%x", e.getRegister32(ESI)),
-			Edi: fmt.Sprintf("0x%x", e.getRegister32(EDI)),
-			Eip: fmt.Sprintf("0x%x", e.eip),
+			Eax:    fmt.Sprintf("0x%x", e.getRegister32(EAX)),
+			Ecx:    fmt.Sprintf("0x%x", e.getRegister32(ECX)),
+			Ebx:    fmt.Sprintf("0x%x", e.getRegister32(EBX)),
+			Edx:    fmt.Sprintf("0x%x", e.getRegister32(EDX)),
+			Esp:    fmt.Sprintf("0x%x", e.getRegister32(ESP)),
+			Ebp:    fmt.Sprintf("0x%x", e.getRegister32(EBP)),
+			Esi:    fmt.Sprintf("0x%x", e.getRegister32(ESI)),
+			Edi:    fmt.Sprintf("0x%x", e.getRegister32(EDI)),
+			Eip:    fmt.Sprintf("0x%x", e.eip),
+			Eflags: fmt.Sprintf("0x%x", e.eflags),
+			Cs:     fmt.Sprintf("0x%x", e.sreg[CS]),
+			Ss:     fmt.Sprintf("0x%x", e.sreg[SS]),
+			Ds:     fmt.Sprintf("0x%x", e.sreg[DS]),
+			Es:     fmt.Sprintf("0x%x", e.sreg[ES]),
+			Fs:     fmt.Sprintf("0x%x", 0),
+			Gs:     fmt.Sprintf("0x%x", e.sreg[GS]),
 		}
 		res = append(res, regSet)
 	}
-	return res
+
+	// dump to emu_xv6.log
+	content, err := yaml.Marshal(&res)
+	if err != nil {
+		panic(err)
+	}
+	ioutil.WriteFile("emu_xv6.log", content, os.ModePerm)
 }
 
 // return register values obtained from qemu and gdb
-func ExecQemu() []RegisterSet {
+func ExecQemu() {
+	_, err := os.Stat("qemu_xv6.log")
+	if err == nil {
+		// Already Exist
+		return
+	}
+
 	gdbScriptPath := MakeGdbScript()
 
 	qemuCmd := exec.Command("qemu-system-i386",
@@ -141,68 +161,40 @@ func ExecQemu() []RegisterSet {
 	`).Output()
 	// fmt.Printf("gdb output=<output>%s</output>\n", gdbOutput)
 
-	file, _ := os.Create(`qemu.log`)
+	file, _ := os.Create(`qemu_xv6.log`)
 	defer file.Close()
 
 	file.Write(([]byte)(gdbOutput))
 
 	var res []RegisterSet
-	err := yaml.Unmarshal([]byte(gdbOutput), &res)
+	err = yaml.Unmarshal([]byte(gdbOutput), &res)
 	if err != nil {
 		panic(err.Error())
 	}
-
-	return res
+	// return res
 }
 
 func TestXv6(t *testing.T) {
 	b := time.Now()
-	QemuRegSet := ExecQemu()
+	ExecEmu()
 	a := time.Now()
-	fmt.Printf("Qemu Execution Time is %v\n", a.Sub(b))
-
-	b = time.Now()
-	EmuRegSet := ExecEmu()
-	a = time.Now()
 	fmt.Printf("Emu Execution Time is %v\n", a.Sub(b))
 
-	if len(QemuRegSet) != NumStep || len(EmuRegSet) != NumStep {
-		t.Fatalf("len(QemuRegSet)=%d len(EmuRegSet)=%d NumStep=%d\n",
-			len(QemuRegSet), len(EmuRegSet), NumStep)
+	b = time.Now()
+	ExecQemu()
+	a = time.Now()
+	fmt.Printf("Qemu Execution Time is %v\n", a.Sub(b))
+
+	command := `diff <(sed 's/"//g' emu_xv6.log | head -n ` + fmt.Sprintf("%d", NumStep*16) + `) <(head -n ` + fmt.Sprintf("%d", NumStep*16) + ` qemu_xv6.log)`
+	fmt.Printf("Diff Command is \"%s\"\n", command)
+	diffStr, _ := exec.Command("bash", "-c", command).Output()
+
+	if len(diffStr) > 0 {
+		t.Errorf("Register Difference is as below:\n%s", string(diffStr))
 	}
 
-	for i := 0; i < NumStep; i++ {
-		fmt.Printf("[qemu #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s edi=%s ebp=%s\n",
-			i, QemuRegSet[i].Eip, QemuRegSet[i].Eax, QemuRegSet[i].Ecx, QemuRegSet[i].Esp,
-			QemuRegSet[i].Edx, QemuRegSet[i].Edi, QemuRegSet[i].Ebp)
-		fmt.Printf("[tiny #%d] eip=%s eax=%s ecx=%s esp=%s edx=%s edi=%s ebp=%s\n",
-			i, EmuRegSet[i].Eip, EmuRegSet[i].Eax, EmuRegSet[i].Ecx, EmuRegSet[i].Esp,
-			EmuRegSet[i].Edx, EmuRegSet[i].Edi, EmuRegSet[i].Ebp)
-		if QemuRegSet[i].Eip != EmuRegSet[i].Eip {
-			t.Fatalf("bad eip")
-		} else if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
-			t.Fatalf("bad eax")
-		} else if QemuRegSet[i].Ecx != EmuRegSet[i].Ecx {
-			t.Fatalf("bad ecx")
-		} else if QemuRegSet[i].Edx != EmuRegSet[i].Edx {
-			t.Fatalf("bad edx")
-		} else if QemuRegSet[i].Ebx != EmuRegSet[i].Ebx {
-			t.Fatalf("bad ebx")
-		} else if QemuRegSet[i].Esp != EmuRegSet[i].Esp {
-			t.Fatalf("bad esp")
-		} else if QemuRegSet[i].Ebp != EmuRegSet[i].Ebp {
-			t.Fatalf("bad ebp")
-		} else if QemuRegSet[i].Esi != EmuRegSet[i].Esi {
-			t.Fatalf("bad esi")
-		} else if QemuRegSet[i].Edi != EmuRegSet[i].Edi {
-			t.Fatalf("bad edi")
-		}
-		// if QemuRegSet[i].Eax != EmuRegSet[i].Eax {
-		// 	t.Fatalf("bad eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",
-		// 	QemuRegSet[i].Eip, QemuRegSet[i].Eax, EmuRegSet[i].Eax)
-		// } else {
-		// 	fmt.Printf("correct eax: qemu_eip=%s qemu_eax=%s emu_eax=%s\n",
-		// 	QemuRegSet[i].Eip, QemuRegSet[i].Eax, EmuRegSet[i].Eax)
-		// }
-	}
+	// if len(QemuRegSet) != NumStep || len(EmuRegSet) != NumStep {
+	// 	t.Fatalf("len(QemuRegSet)=%d len(EmuRegSet)=%d NumStep=%d\n",
+	// 		len(QemuRegSet), len(EmuRegSet), NumStep)
+	// }
 }

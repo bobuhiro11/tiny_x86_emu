@@ -23,5 +23,6 @@ tags.lock
 
 # other
 *.swp
-qemu.log
+qemu_xv6.log
+emu_xv6.log
 xv6-public
