@@ -33,7 +33,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 100000
+	NumStep = 140000
 	// NumStep = 2000000 // This is for qemu_xv6.log
 )
 
@@ -185,9 +185,18 @@ func TestXv6(t *testing.T) {
 	a = time.Now()
 	fmt.Printf("Qemu Execution Time is %v\n", a.Sub(b))
 
+	// wcStr, err := exec.Command(`wc`, `-l`, `*.log`).Output()
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// fmt.Printf("%s", string(wcStr))
+
 	command := `diff <(sed 's/"//g' emu_xv6.log | head -n ` + fmt.Sprintf("%d", NumStep*16) + ` | grep -v eflags) <(head -n ` + fmt.Sprintf("%d", NumStep*16) + ` qemu_xv6.log | grep -v eflags)`
 	fmt.Printf("Diff Command is \"%s\"\n", command)
-	diffStr, _ := exec.Command("bash", "-c", command).Output()
+	diffStr, err := exec.Command("bash", "-c", command).Output()
+	if err != nil {
+		t.Error(err)
+	}
 
 	if len(diffStr) > 0 {
 		t.Errorf("Register Difference is as below:\n%s", string(diffStr))
