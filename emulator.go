@@ -1603,12 +1603,12 @@ func (e *Emulator) getSingedCode16(index int32) int16 {
 
 // ModRM parameter
 type ModRM struct {
-	mod       uint8
-	opecode   uint8 // This can be regarded as regIndex.
-	rm        uint8
-	disp32    uint32 // This can be regarded as (disp8, signed int8, disp16 signed int16).
-	sib       uint8  // sib byte
-	disp32Sib uint32 // disp32 for sib
+	mod     uint8
+	opecode uint8 // This can be regarded as regIndex.
+	rm      uint8
+	disp32  uint32 // This can be regarded as (disp8, signed int8, disp16 signed int16).
+	sib     uint8  // sib byte
+	// disp32Sib uint32 // disp32 for sib
 }
 
 func (m *ModRM) getSib(e *Emulator) uint32 {
@@ -1620,11 +1620,11 @@ func (m *ModRM) getSib(e *Emulator) uint32 {
 		// calc base value
 		var result uint32
 		if m.mod == 2 {
-			result = e.getRegister32(base) + m.disp32Sib
+			result = e.getRegister32(base)
 		} else if m.mod == 1 {
-			result = e.getRegister32(base) + (m.disp32Sib & 0xFF) // TODO: minus value?
+			result = e.getRegister32(base)
 		} else if base == 5 {
-			result = m.disp32Sib
+			result = m.disp32
 		} else {
 			result = e.getRegister32(base)
 		}
