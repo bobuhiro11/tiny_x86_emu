@@ -1629,9 +1629,7 @@ func (m *ModRM) getSib(e *Emulator) uint32 {
 			result = e.getRegister32(base)
 		}
 
-		if scale > 0 {
-			result += e.getRegister32(index) * uint32(1<<scale)
-		}
+		result += e.getRegister32(index) * uint32(1<<scale)
 
 		fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib, base, index, scale, result)
 		return result

@@ -21,7 +21,7 @@ guest_bin:
 		nasm -f bin ./guest/$${name}.asm -o ./guest/$${name}.bin ; \
 	done
 	# elf from gcc
-	for name in test test132 test133 test134 ; do \
+	for name in test test132 test133 test134 test135 ; do \
 		gcc -nostdlib -fno-pie -fno-asynchronous-unwind-tables -g -fno-stack-protector -m32 \
 		-c guest/$${name}.c -o guest/$${name}.o ; \
 	done
@@ -36,6 +36,8 @@ guest_bin:
 		-o guest/test133.bin guest/crt0.o guest/test133.o
 	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
 		-o guest/test134.bin guest/crt0.o guest/test134.o
+	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
+		-o guest/test135.bin guest/crt0.o guest/test135.o
 	# disasm
 	# objdump -D -b binary -m i386:x86-64 ./guest/addjmp.bin
 	# ndisasm -b 32 guest/test143.bin

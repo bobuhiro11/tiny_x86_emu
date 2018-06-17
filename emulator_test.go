@@ -76,6 +76,11 @@ func Test134(t *testing.T) {
 	assetRegister32(t, e, "EAX", EAX, 0x0000)
 }
 
+func Test135(t *testing.T) {
+	e, _ := run(t, "guest/test135.bin", true)
+	assetRegister32(t, e, "EAX", EAX, 0x800fffff)
+}
+
 func Test141(t *testing.T) {
 	e, actual := run(t, "guest/test141.bin", true)
 	expected := "A\x0a"
