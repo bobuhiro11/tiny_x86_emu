@@ -33,7 +33,7 @@ type RegisterSet struct {
 }
 
 const (
-	NumStep = 100000
+	NumStep = 1000000
 	// NumStep = 2000000 // This is for qemu_xv6.log
 )
 
