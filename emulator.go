@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"io"
-	// "math"
 )
 
 // 32bit registers
@@ -81,7 +80,6 @@ type Emulator struct {
 // NewEmulator creates New Emulator
 func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
 	e := &Emulator{
-		// memory:      make([]uint8, memorySize * 2),
 		memory:   map[uint32]uint8{},
 		eip:      eip,
 		isSilent: isSilent,
@@ -342,8 +340,8 @@ func (e *Emulator) insd() {
 	ioAddress := e.getRegister16(DX)
 	value := e.io.in32(ioAddress)
 	memAddress := e.getRegister32(EDI)
-	fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
-		value, ioAddress, memAddress, e.v2p(memAddress))
+	// fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
+	// 	value, ioAddress, memAddress, e.v2p(memAddress))
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
 	e.eip++
@@ -481,14 +479,14 @@ func (e *Emulator) movR32Imm32() {
 
 func (e *Emulator) movEaxMoffs32() {
 	value := e.getMemory32(e.getCode32(1))
-	fmt.Printf("value=0x%x\n", value)
+	// fmt.Printf("value=0x%x\n", value)
 	e.setRegister32(EAX, value)
 	e.eip += 5
 }
 
 func (e *Emulator) movMoffs32Eax() {
 	value := e.getRegister32(EAX)
-	fmt.Printf("value=0x%x\n", value)
+	// fmt.Printf("value=0x%x\n", value)
 	// e.setRegister32(EAX, value)
 	e.setMemory32(e.getCode32(1), value)
 	e.eip += 5
@@ -519,7 +517,7 @@ func (e *Emulator) code81() {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip += 4
-		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		// fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) + uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
@@ -527,14 +525,14 @@ func (e *Emulator) code81() {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip += 4
-		fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		// fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) & uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
-		fmt.Printf("eip=%x rm32 value=0x%x imm32 value=0x%x\n", e.eip, rm32, imm32)
+		// fmt.Printf("eip=%x rm32 value=0x%x imm32 value=0x%x\n", e.eip, rm32, imm32)
 		e.eip += 4
 		result := uint64(rm32) - uint64(imm32)
 		e.eflags.updateBySub(rm32, imm32, result)
@@ -666,12 +664,12 @@ func (e *Emulator) codeFf() {
 		address := e.calcMemoryAddress32(m)
 		jmpAddress := e.getMemory32(address)
 		e.push32(e.eip + 6)
-		fmt.Printf("address=0x%x jmpAddress=0x%x\n", address, jmpAddress)
+		// fmt.Printf("address=0x%x jmpAddress=0x%x\n", address, jmpAddress)
 		e.eip = jmpAddress
 	}
 	jmpRm32 := func(e *Emulator, m ModRM) {
 		address := e.getRm32(m)
-		fmt.Printf("address=0x%x\n", address)
+		// fmt.Printf("address=0x%x\n", address)
 		e.eip = address
 	}
 	e.eip++
@@ -727,7 +725,7 @@ func (e *Emulator) subRm32R32() {
 	m := e.parseModRM()
 	rm32 := e.getRm32(m)
 	r32 := e.getR32(m)
-	fmt.Printf("rm32=0x%x r32=0x%x\n", rm32, r32)
+	// fmt.Printf("rm32=0x%x r32=0x%x\n", rm32, r32)
 	e.setRm32(m, rm32-r32)
 }
 
@@ -766,7 +764,7 @@ func (e *Emulator) addR32Rm32() {
 func (e *Emulator) leaR32Rm32() {
 	e.eip++
 	m := e.parseModRM()
-	fmt.Printf("leaR32Rm32 r=%d\n", m.opecode)
+	// fmt.Printf("leaR32Rm32 r=%d\n", m.opecode)
 	e.setR32(m, e.calcMemoryAddress32(m))
 }
 
@@ -1230,7 +1228,7 @@ func (e *Emulator) getRm32(m ModRM) uint32 {
 		return e.getRegister32(m.rm)
 	}
 	address := e.calcMemoryAddress32(m)
-	fmt.Printf("rm32 address=0x%x\n", address)
+	// fmt.Printf("rm32 address=0x%x\n", address)
 	return e.getMemory32(address)
 }
 
@@ -1634,7 +1632,7 @@ func (m *ModRM) getSib(e *Emulator) uint32 {
 			result += e.getRegister32(index) * uint32(1<<scale)
 		}
 
-		fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib, base, index, scale, result)
+		// fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib, base, index, scale, result)
 		return result
 	}
 	return uint32(0)
