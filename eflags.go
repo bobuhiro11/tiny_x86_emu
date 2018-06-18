@@ -42,6 +42,18 @@ func (ef *Eflags) isEnable(flag uint32) bool {
 	return uint32(*ef)&flag == flag
 }
 
+func (ef *Eflags) updateBySub8(v1, v2 uint8, result uint16) {
+	sign1 := (v1 >> 7) & 0x01
+	sign2 := (v2 >> 7) & 0x01
+	signr := uint8((result >> 7) & 0x01)
+
+	ef.setVal(CarryFlag, (result>>8) != 0)
+	ef.setVal(ZeroFlag, result == 0)
+	ef.setVal(SignFlag, signr != 0)
+	ef.setVal(OverflowFlag,
+		(sign1 == 0 && sign2 == 1 && signr == 1) || (sign1 == 1 && sign2 == 0 && signr == 0))
+}
+
 func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 	sign1 := (v1 >> 31) & 0x01
 	sign2 := (v2 >> 31) & 0x01

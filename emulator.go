@@ -126,12 +126,16 @@ func (e *Emulator) execInst() error {
 		}
 	case 0x29:
 		e.subRm32R32()
+	case 0x2D:
+		e.subEaxImm32()
 	case 0x31:
 		if (e.genuineProtectedEnable && !e.operandSizeOverride) || (!e.genuineProtectedEnable && e.operandSizeOverride) {
 			e.xorRm32R32()
 		} else {
 			e.xorRm16R16()
 		}
+	case 0x38:
+		e.cmpRm8R8()
 	case 0x39:
 		e.cmpRm32R32()
 	case 0x3b:
@@ -195,6 +199,8 @@ func (e *Emulator) execInst() error {
 		e.jng()
 	case 0x7F:
 		e.jg()
+	case 0x80:
+		e.orRm8Imm8()
 	case 0x81:
 		e.code81()
 	case 0x83:
@@ -406,7 +412,17 @@ func (e *Emulator) code0f() {
 	}
 	jne := func() {
 		rel := e.getCode32(0)
-		e.eip += rel + 4
+		e.eip += 4
+		if !e.eflags.isEnable(ZeroFlag) {
+			e.eip += rel
+		}
+	}
+	je := func() {
+		rel := e.getCode32(0)
+		e.eip += 4
+		if e.eflags.isEnable(ZeroFlag) {
+			e.eip += rel
+		}
 	}
 
 	second := e.getCode8(1)
@@ -417,6 +433,8 @@ func (e *Emulator) code0f() {
 		movR32Cr()
 	} else if second == 0x22 {
 		movCrR32()
+	} else if second == 0x84 {
+		je()
 	} else if second == 0x85 {
 		jne()
 	} else if second == 0xB6 {
@@ -508,6 +526,12 @@ func (e *Emulator) orEaxImm32() {
 
 func (e *Emulator) addEaxImm32() {
 	value := e.getCode32(1) + e.getRegister32(EAX)
+	e.setRegister32(EAX, value)
+	e.eip += 5
+}
+
+func (e *Emulator) subEaxImm32() {
+	value := e.getCode32(1) - e.getRegister32(EAX)
 	e.setRegister32(EAX, value)
 	e.eip += 5
 }
@@ -701,6 +725,15 @@ func (e *Emulator) movRm8R8() {
 	e.setRm8(m, r8)
 }
 
+func (e *Emulator) cmpRm8R8() {
+	e.eip++
+	m := e.parseModRM()
+	r8 := e.getR8(m)
+	rm8 := e.getRm8(m)
+	result := uint16(rm8) - uint16(r8)
+	e.eflags.updateBySub8(rm8, r8, result)
+}
+
 func (e *Emulator) xorRm16R16() {
 	e.eip++
 	m := e.parseModRM()
@@ -866,6 +899,15 @@ func (e *Emulator) testRm32Imm32() {
 	e.eflags.unset(CarryFlag)
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
+}
+
+func (e *Emulator) orRm8Imm8() {
+	e.eip++
+	m := e.parseModRM()
+	value := e.getCode8(0)
+	e.eip++
+
+	e.setRm8(m, value)
 }
 
 func (e *Emulator) testRm8Imm8() {
