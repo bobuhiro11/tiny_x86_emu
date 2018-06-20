@@ -46,10 +46,12 @@ func (io *IO) in8(address uint16) uint8 {
 			io.memory[address] = 0x58
 		}
 		times0x01f7++
-	case 0x03f8: // Reciever Buffer Register
+	case 0x03f8: // COM1+0: Reciever Buffer Register
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		io.memory[address] = input[0]
+	case 0x03f8 + 5: // COM1+5: Line Status Register
+		io.memory[address] = 0x20
 	}
 	return io.memory[address]
 }
@@ -68,7 +70,7 @@ func (io *IO) out16(address, value uint16) {
 }
 
 func (io *IO) out8(address uint16, value uint8) {
-	fmt.Printf("io.out8 address=0x%x value=0x%x\n", address, value)
+	// fmt.Printf("io.out8 address=0x%x value=0x%x\n", address, value)
 	io.memory[address] = value
 	switch address {
 	case 0x01f2: // Secter Count
@@ -102,7 +104,7 @@ func (io *IO) out8(address uint16, value uint8) {
 		return
 	case 0x0064: // Keyboard Input Buffer
 		return
-	case 0x03f8: // Transmitter Holding Register
+	case 0x03f8: // COM1+0: Transmitter Holding Register
 		fmt.Fprint(*io.writer, string(io.memory[address]))
 	default:
 		return
