@@ -344,7 +344,7 @@ func (e *Emulator) execInst() error {
 	case 0xF6:
 		e.testRm8Imm8()
 	case 0xF7:
-		e.testRm32Imm32()
+		e.testRm32Imm32() // FIXME: testRm32Imm32(0xF7 /0) or negRm32(0xF7 /3)
 	case 0xFA:
 		e.cli()
 	case 0xFC:
