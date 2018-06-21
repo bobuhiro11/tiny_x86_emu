@@ -248,6 +248,8 @@ func (e *Emulator) execInst() error {
 		e.code81()
 	case 0x83:
 		e.code83()
+	case 0x88:
+		e.movRm8R8()
 	case 0x89:
 		e.movRm32R32()
 	case 0x9C:
@@ -284,6 +286,8 @@ func (e *Emulator) execInst() error {
 		e.codeC1()
 	case 0xC3:
 		e.ret()
+	case 0xC6:
+		e.movRm8Imm8()
 	case 0xC7:
 		e.movRm32Imm32()
 	case 0xC9:
@@ -344,7 +348,7 @@ func (e *Emulator) execInst() error {
 	case 0xF6:
 		e.testRm8Imm8()
 	case 0xF7:
-		e.testRm32Imm32() // FIXME: testRm32Imm32(0xF7 /0) or negRm32(0xF7 /3)
+		e.codeF7()
 	case 0xFA:
 		e.cli()
 	case 0xFC:
@@ -406,6 +410,56 @@ func (e *Emulator) cld() {
 	e.eip++
 }
 
+// eip=801005f6 opecode = 0 is not implemented.
+func (e *Emulator) codeF7() {
+	testRm32Imm32 := func(e *Emulator, m ModRM) {
+		value := e.getCode32(0)
+		e.eip += 4
+		result := e.getRm32(m) & value
+		if result == 0 {
+			e.eflags.set(ZeroFlag)
+		} else {
+			e.eflags.unset(ZeroFlag)
+		}
+		e.eflags.unset(CarryFlag)
+		e.eflags.unset(OverflowFlag)
+		e.eflags.updatePF(uint8(result & 0xFF))
+	}
+	negRm32 := func(e *Emulator, m ModRM) {
+		value := e.getRm32(m)
+		e.setRm32(m, (^value)+1)
+	}
+	divRm32 := func(e *Emulator, m ModRM) {
+		// x/y = a ... b
+		x := (uint64(e.getRegister32(EDX)) << 32) | uint64(e.getRegister32(EAX))
+		y := uint64(e.getRm32(m))
+		a := uint32(x / y)
+		b := uint32(x % y)
+
+		e.setRegister32(EAX, a)
+		e.setRegister32(EDX, b)
+	}
+
+	e.eip++
+	m := e.parseModRM()
+
+	if e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+		e.genuineProtectedEnable == true && e.operandSizeOverride == true {
+		panic("16bit mode is not implemented")
+	}
+
+	switch m.opecode {
+	case 0:
+		testRm32Imm32(e, m)
+	case 3:
+		negRm32(e, m)
+	case 6:
+		divRm32(e, m)
+	default:
+		panic(fmt.Sprintf("eip=%x opecode = %d\n", e.eip, m.opecode) + "not implemented")
+	}
+}
+
 func (e *Emulator) code0f() {
 	lgdt := func() {
 		m := e.parseModRM()
@@ -450,8 +504,25 @@ func (e *Emulator) code0f() {
 	}
 	MovzxR32Rm16 := func() {
 		m := e.parseModRM()
-		fmt.Printf("m.disp32=0x%x\n", m.disp32)
+		// fmt.Printf("m.disp32=0x%x\n", m.disp32)
 		e.setRegister32(m.opecode, uint32(e.getMemory16(m.disp32)))
+	}
+	MovsxR32Rm8 := func() {
+		m := e.parseModRM()
+		value := uint32(e.getRm8(m))
+		if value&0x80 != 0 {
+			value |= 0xFFFFFF00
+		}
+		e.setRegister32(m.opecode, value)
+	}
+	MovsxR32Rm16 := func() {
+		m := e.parseModRM()
+		// fmt.Printf("m.disp32=0x%x\n", m.disp32)
+		value := uint32(e.getMemory16(m.disp32))
+		if value&0x8000 != 0 {
+			value |= 0xFFFF0000
+		}
+		e.setRegister32(m.opecode, value)
 	}
 	jne := func() {
 		rel := e.getCode32(0)
@@ -493,6 +564,10 @@ func (e *Emulator) code0f() {
 		MovzxR32Rm8()
 	} else if second == 0xB7 {
 		MovzxR32Rm16()
+	} else if second == 0xBe {
+		MovsxR32Rm8()
+	} else if second == 0xBf {
+		MovsxR32Rm16()
 	} else {
 		panic(fmt.Sprintf("EIP=0x%x 0x0F 0x%x is not implemented\n", e.eip-1, second))
 	}
@@ -560,6 +635,14 @@ func (e *Emulator) movMoffs32Eax() {
 	// e.setRegister32(EAX, value)
 	e.setMemory32(e.getCode32(1), value)
 	e.eip += 5
+}
+
+func (e *Emulator) movRm8Imm8() {
+	e.eip++
+	m := e.parseModRM()
+	value := e.getCode8(0)
+	e.eip += 1
+	e.setRm8(m, value)
 }
 
 func (e *Emulator) movRm32Imm32() {
@@ -931,6 +1014,7 @@ func (e *Emulator) testEaxImm32() {
 	e.eflags.unset(CarryFlag)
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
+	e.eflags.setVal(SignFlag, result&0x80000000 != 0)
 	e.eip += 5
 }
 
@@ -946,22 +1030,7 @@ func (e *Emulator) testRm32R32() {
 	e.eflags.unset(CarryFlag)
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
-}
-
-func (e *Emulator) testRm32Imm32() {
-	e.eip++
-	m := e.parseModRM()
-	value := e.getCode32(0)
-	e.eip += 4
-	result := e.getRm32(m) & value
-	if result == 0 {
-		e.eflags.set(ZeroFlag)
-	} else {
-		e.eflags.unset(ZeroFlag)
-	}
-	e.eflags.unset(CarryFlag)
-	e.eflags.unset(OverflowFlag)
-	e.eflags.updatePF(uint8(result & 0xFF))
+	e.eflags.setVal(SignFlag, result&0x80000000 != 0)
 }
 
 func (e *Emulator) orRm8Imm8() {
@@ -989,6 +1058,7 @@ func (e *Emulator) testRm8Imm8() {
 	e.eflags.unset(CarryFlag)
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
+	e.eflags.setVal(SignFlag, result&0x80 != 0)
 }
 
 // e.setRegister32(m.opecode, uint32(e.getMemory8(m.disp32)))
@@ -1004,6 +1074,7 @@ func (e *Emulator) testAxImm16() {
 	e.eflags.unset(CarryFlag)
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
+	e.eflags.setVal(SignFlag, result&0x8000 != 0)
 	e.eip += 3
 }
 
@@ -1051,6 +1122,7 @@ func (e *Emulator) testAlImm8() {
 	e.eflags.unset(CarryFlag)
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
+	e.eflags.setVal(SignFlag, result&0x80 != 0)
 	e.eip += 2
 }
 

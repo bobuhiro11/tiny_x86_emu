@@ -110,7 +110,8 @@ func main() {
 	// for e.eip < 0x7c00+0x200000 {
 	i := 0
 	for {
-		if !*silent && 0x80100500 < e.eip && e.eip < 0x801005ff {
+		// if !*silent && 0x80100500 < e.eip && e.eip < 0x801005ff {
+		if !*silent && i > 3635000 {
 			e.dump(i)
 		}
 		err := e.execInst()
