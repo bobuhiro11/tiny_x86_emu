@@ -98,9 +98,9 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 		e.genuineProtectedEnable = true
 	}
 
-	// setup EBDA (struct mp) at 0x9FC00
-	ebdaBase := uint32(0x9FC00)
-	mpConfigTableBase := uint32(0xA000) // need check
+	// setup EBDA (struct mp) at 0x500
+	ebdaBase := uint32(0x600)
+	mpConfigTableBase := uint32(0x700) // need check
 	e.memory[0x040E] = uint8(ebdaBase >> 4)
 	e.memory[0x040F] = uint8(ebdaBase >> 12)
 	fmt.Printf("EBDA address=0x%X\n",
@@ -129,17 +129,30 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	}
 	e.memory[ebdaBase+10] = uint8(0 - s)
 
-	// setup (struct mpconf)
+	// setup (struct mpconf) at mpConfigTableBase
 	e.memory[mpConfigTableBase+0] = 'P' // signature PCMP
 	e.memory[mpConfigTableBase+1] = 'C'
 	e.memory[mpConfigTableBase+2] = 'M'
 	e.memory[mpConfigTableBase+3] = 'P'
-	e.memory[mpConfigTableBase+4] = 0 // FIXME: length
+	e.memory[mpConfigTableBase+4] = 44 // FIXME: length
 	e.memory[mpConfigTableBase+5] = 0
 	e.memory[mpConfigTableBase+6] = 1  // version
-	e.memory[mpConfigTableBase+7] = 0  // checksum
-	e.memory[mpConfigTableBase+8] = 0  // product[0]
-	e.memory[mpConfigTableBase+27] = 0 // product[19]
+	e.memory[mpConfigTableBase+7] = 0  // FIXME: checksum
+	e.memory[mpConfigTableBase+8] = 0  // product id (uchar [20])
+	e.memory[mpConfigTableBase+28] = 0 // OEM table pointer
+	e.memory[mpConfigTableBase+32] = 0 // OEM OEM table length
+	e.memory[mpConfigTableBase+34] = 0 // entry count
+	e.memory[mpConfigTableBase+36] = 0 // adress of local APIC
+	e.memory[mpConfigTableBase+40] = 0 // extended table length
+	e.memory[mpConfigTableBase+42] = 0 // extended table checksum
+	e.memory[mpConfigTableBase+43] = 0 // reserved
+
+	// setup checksum for (struct mpconf)
+	s = uint8(0)
+	for i := uint32(0); i < uint32(e.memory[mpConfigTableBase+4]); i++ {
+		s = s + e.memory[ebdaBase+i]
+	}
+	e.memory[mpConfigTableBase+7] = uint8(0 - s)
 	return e
 }
 
@@ -228,6 +241,8 @@ func (e *Emulator) execInst() error {
 		e.js()
 	case 0x79:
 		e.jns()
+	case 0x84:
+		e.testRm8R8()
 	case 0x85:
 		e.testRm32R32()
 	case 0x7A:
@@ -545,6 +560,20 @@ func (e *Emulator) code0f() {
 			e.eip += rel
 		}
 	}
+	jae := func() {
+		rel := e.getCode32(0)
+		e.eip += 4
+		if !e.eflags.isEnable(CarryFlag) {
+			e.eip += rel
+		}
+	}
+	ja := func() {
+		rel := e.getCode32(0)
+		e.eip += 4
+		if !e.eflags.isEnable(ZeroFlag) && !e.eflags.isEnable(CarryFlag) {
+			e.eip += rel
+		}
+	}
 
 	second := e.getCode8(1)
 	e.eip += 2
@@ -554,10 +583,14 @@ func (e *Emulator) code0f() {
 		movR32Cr()
 	} else if second == 0x22 {
 		movCrR32()
+	} else if second == 0x83 {
+		jae()
 	} else if second == 0x84 {
 		je()
 	} else if second == 0x85 {
 		jne()
+	} else if second == 0x87 {
+		ja()
 	} else if second == 0x8f {
 		jg()
 	} else if second == 0xB6 {
@@ -1031,6 +1064,21 @@ func (e *Emulator) testRm32R32() {
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eflags.setVal(SignFlag, result&0x80000000 != 0)
+}
+
+func (e *Emulator) testRm8R8() {
+	e.eip++
+	m := e.parseModRM()
+	result := e.getRm8(m) & e.getR8(m)
+	if result == 0 {
+		e.eflags.set(ZeroFlag)
+	} else {
+		e.eflags.unset(ZeroFlag)
+	}
+	e.eflags.unset(CarryFlag)
+	e.eflags.unset(OverflowFlag)
+	e.eflags.updatePF(uint8(result & 0xFF))
+	e.eflags.setVal(SignFlag, result&0x80 != 0)
 }
 
 func (e *Emulator) orRm8Imm8() {
