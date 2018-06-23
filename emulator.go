@@ -58,6 +58,11 @@ const (
 	CR0PagingFlag        = 0x1 << 31
 )
 
+const (
+	EBDABase          = uint32(0x600) // address of struct mp
+	MpConfigTableBase = uint32(0x700) // TODO: address of struct mpconf,need check
+)
+
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
 	registers              [8]uint32        // general registers
@@ -99,60 +104,58 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	}
 
 	// setup EBDA (struct mp) at 0x500
-	ebdaBase := uint32(0x600)
-	mpConfigTableBase := uint32(0x700) // need check
-	e.memory[0x040E] = uint8(ebdaBase >> 4)
-	e.memory[0x040F] = uint8(ebdaBase >> 12)
+	e.memory[0x040E] = uint8(EBDABase >> 4)
+	e.memory[0x040F] = uint8(EBDABase >> 12)
 	fmt.Printf("EBDA address=0x%X\n",
 		((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
-	e.memory[ebdaBase+0] = '_' // signature _MP_
-	e.memory[ebdaBase+1] = 'M'
-	e.memory[ebdaBase+2] = 'P'
-	e.memory[ebdaBase+3] = '_'
-	e.memory[ebdaBase+4] = uint8(mpConfigTableBase >> 0) // phys addr of MP config table
-	e.memory[ebdaBase+5] = uint8(mpConfigTableBase >> 8)
-	e.memory[ebdaBase+6] = uint8(mpConfigTableBase >> 16)
-	e.memory[ebdaBase+7] = uint8(mpConfigTableBase >> 24)
-	e.memory[ebdaBase+8] = 1  // length 1
-	e.memory[ebdaBase+9] = 1  // specrev [14]
-	e.memory[ebdaBase+10] = 0 // checksum
-	e.memory[ebdaBase+11] = 0 // type
-	e.memory[ebdaBase+12] = 0 // imcrp
-	e.memory[ebdaBase+13] = 0 // reserved
-	e.memory[ebdaBase+14] = 0
-	e.memory[ebdaBase+15] = 0
+	e.memory[EBDABase+0] = '_' // signature _MP_
+	e.memory[EBDABase+1] = 'M'
+	e.memory[EBDABase+2] = 'P'
+	e.memory[EBDABase+3] = '_'
+	e.memory[EBDABase+4] = uint8((MpConfigTableBase >> 0) & 0XFF) // phys addr of MP config table
+	e.memory[EBDABase+5] = uint8((MpConfigTableBase >> 8) & 0XFF)
+	e.memory[EBDABase+6] = uint8((MpConfigTableBase >> 16) & 0XFF)
+	e.memory[EBDABase+7] = uint8((MpConfigTableBase >> 24) & 0XFF)
+	e.memory[EBDABase+8] = 1  // length 1
+	e.memory[EBDABase+9] = 1  // specrev [14]
+	e.memory[EBDABase+10] = 0 // checksum
+	e.memory[EBDABase+11] = 0 // type
+	e.memory[EBDABase+12] = 0 // imcrp
+	e.memory[EBDABase+13] = 0 // reserved
+	e.memory[EBDABase+14] = 0
+	e.memory[EBDABase+15] = 0
 
 	// setup checksum for (struct mp)
 	s := uint8(0)
 	for i := uint32(0); i < 16; i++ {
-		s = s + e.memory[ebdaBase+i]
+		s = s + e.memory[EBDABase+i]
 	}
-	e.memory[ebdaBase+10] = uint8(0 - s)
+	e.memory[EBDABase+10] = uint8(0 - s)
 
-	// setup (struct mpconf) at mpConfigTableBase
-	e.memory[mpConfigTableBase+0] = 'P' // signature PCMP
-	e.memory[mpConfigTableBase+1] = 'C'
-	e.memory[mpConfigTableBase+2] = 'M'
-	e.memory[mpConfigTableBase+3] = 'P'
-	e.memory[mpConfigTableBase+4] = 44 // FIXME: length
-	e.memory[mpConfigTableBase+5] = 0
-	e.memory[mpConfigTableBase+6] = 1  // version
-	e.memory[mpConfigTableBase+7] = 0  // FIXME: checksum
-	e.memory[mpConfigTableBase+8] = 0  // product id (uchar [20])
-	e.memory[mpConfigTableBase+28] = 0 // OEM table pointer
-	e.memory[mpConfigTableBase+32] = 0 // OEM OEM table length
-	e.memory[mpConfigTableBase+34] = 0 // entry count
-	e.memory[mpConfigTableBase+36] = 0 // adress of local APIC
-	e.memory[mpConfigTableBase+40] = 0 // extended table length
-	e.memory[mpConfigTableBase+42] = 0 // extended table checksum
-	e.memory[mpConfigTableBase+43] = 0 // reserved
+	// setup (struct mpconf) at MpConfigTableBase
+	e.memory[MpConfigTableBase+0] = 'P' // signature PCMP
+	e.memory[MpConfigTableBase+1] = 'C'
+	e.memory[MpConfigTableBase+2] = 'M'
+	e.memory[MpConfigTableBase+3] = 'P'
+	e.memory[MpConfigTableBase+4] = 44 // FIXME: length
+	e.memory[MpConfigTableBase+5] = 0
+	e.memory[MpConfigTableBase+6] = 1  // version
+	e.memory[MpConfigTableBase+7] = 0  // FIXME: checksum
+	e.memory[MpConfigTableBase+8] = 0  // product id (uchar [20])
+	e.memory[MpConfigTableBase+28] = 0 // OEM table pointer
+	e.memory[MpConfigTableBase+32] = 0 // OEM OEM table length
+	e.memory[MpConfigTableBase+34] = 0 // entry count
+	e.memory[MpConfigTableBase+36] = 0 // adress of local APIC
+	e.memory[MpConfigTableBase+40] = 0 // extended table length
+	e.memory[MpConfigTableBase+42] = 0 // extended table checksum
+	e.memory[MpConfigTableBase+43] = 0 // reserved
 
 	// setup checksum for (struct mpconf)
 	s = uint8(0)
-	for i := uint32(0); i < uint32(e.memory[mpConfigTableBase+4]); i++ {
-		s = s + e.memory[ebdaBase+i]
+	for i := uint32(0); i < uint32(e.memory[MpConfigTableBase+4]); i++ {
+		s = s + e.memory[EBDABase+i]
 	}
-	e.memory[mpConfigTableBase+7] = uint8(0 - s)
+	e.memory[MpConfigTableBase+7] = uint8(0 - s)
 	return e
 }
 
