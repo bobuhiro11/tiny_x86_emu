@@ -82,6 +82,30 @@ type Emulator struct {
 	disasm                 map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
+func getEBDA() [16]byte {
+	ebda := [16]byte{
+		'_', 'M', 'P', '_', // signature _MP_
+		uint8((MpConfigTableBase >> 0) & 0XFF), // phys addr of MP config table
+		uint8((MpConfigTableBase >> 8) & 0XFF),
+		uint8((MpConfigTableBase >> 16) & 0XFF),
+		uint8((MpConfigTableBase >> 24) & 0XFF),
+		1,       // length 1
+		1,       // specrev [14]
+		0,       // checksum
+		0,       // type
+		0,       // imcrp
+		0, 0, 0, // reserved
+	}
+
+	// setup checksum for (struct mp)
+	s := uint8(0)
+	for i := uint32(0); i < 16; i++ {
+		s = s + ebda[i]
+	}
+	ebda[10] = uint8(0 - s)
+	return ebda
+}
+
 // NewEmulator creates New Emulator
 func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
 	e := &Emulator{
@@ -103,34 +127,15 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 		e.genuineProtectedEnable = true
 	}
 
-	// setup EBDA (struct mp) at 0x500
+	// setup BDA (BIOS Data Area)
 	e.memory[0x040E] = uint8(EBDABase >> 4)
 	e.memory[0x040F] = uint8(EBDABase >> 12)
-	fmt.Printf("EBDA address=0x%X\n",
-		((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
-	e.memory[EBDABase+0] = '_' // signature _MP_
-	e.memory[EBDABase+1] = 'M'
-	e.memory[EBDABase+2] = 'P'
-	e.memory[EBDABase+3] = '_'
-	e.memory[EBDABase+4] = uint8((MpConfigTableBase >> 0) & 0XFF) // phys addr of MP config table
-	e.memory[EBDABase+5] = uint8((MpConfigTableBase >> 8) & 0XFF)
-	e.memory[EBDABase+6] = uint8((MpConfigTableBase >> 16) & 0XFF)
-	e.memory[EBDABase+7] = uint8((MpConfigTableBase >> 24) & 0XFF)
-	e.memory[EBDABase+8] = 1  // length 1
-	e.memory[EBDABase+9] = 1  // specrev [14]
-	e.memory[EBDABase+10] = 0 // checksum
-	e.memory[EBDABase+11] = 0 // type
-	e.memory[EBDABase+12] = 0 // imcrp
-	e.memory[EBDABase+13] = 0 // reserved
-	e.memory[EBDABase+14] = 0
-	e.memory[EBDABase+15] = 0
 
-	// setup checksum for (struct mp)
-	s := uint8(0)
-	for i := uint32(0); i < 16; i++ {
-		s = s + e.memory[EBDABase+i]
+	// setup EBDA (struct mp) at EBDABase
+	fmt.Printf("EBDA address=0x%X\n", ((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
+	for i, val := range getEBDA() {
+		e.memory[EBDABase+uint32(i)] = val
 	}
-	e.memory[EBDABase+10] = uint8(0 - s)
 
 	// setup (struct mpconf) at MpConfigTableBase
 	e.memory[MpConfigTableBase+0] = 'P' // signature PCMP
@@ -151,7 +156,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	e.memory[MpConfigTableBase+43] = 0 // reserved
 
 	// setup checksum for (struct mpconf)
-	s = uint8(0)
+	s := uint8(0)
 	for i := uint32(0); i < uint32(e.memory[MpConfigTableBase+4]); i++ {
 		s = s + e.memory[EBDABase+i]
 	}
