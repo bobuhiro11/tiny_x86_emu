@@ -61,6 +61,7 @@ const (
 const (
 	EBDABase          = uint32(0x600) // address of struct mp
 	MpConfigTableBase = uint32(0x700) // TODO: address of struct mpconf,need check
+	LocalAPICBase     = uint32(0xFEC80000)
 )
 
 // Emulator is an i386 Virtual Machine
@@ -80,6 +81,71 @@ type Emulator struct {
 	operandSizeOverride    bool              // true if operand size override (0x66) is enabled
 	genuineProtectedEnable bool              // procted mode is refreshed only when sreg is changed
 	disasm                 map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
+}
+
+func getMpConf() [72]byte {
+	var mpconf [72]byte
+
+	// configuration table header (struct mpconf)
+	mpconf[0] = 'P'                                  // signature
+	mpconf[1] = 'C'                                  // signature
+	mpconf[2] = 'M'                                  // signature
+	mpconf[3] = 'P'                                  // signature
+	mpconf[4] = 72                                   // FIXME: length
+	mpconf[5] = 0                                    // FIXME: length
+	mpconf[6] = 1                                    // version
+	mpconf[7] = 0                                    // FIXME: checksum
+	mpconf[8] = 0                                    // product id (uchar [20])
+	mpconf[28] = 0                                   // OEM table pointer
+	mpconf[32] = 0                                   // OEM OEM table length
+	mpconf[34] = 0                                   // entry count
+	mpconf[36] = uint8((LocalAPICBase >> 0) & 0XFF)  // FIXME: adress of local APIC
+	mpconf[37] = uint8((LocalAPICBase >> 8) & 0XFF)  // FIXME: adress of local APIC
+	mpconf[38] = uint8((LocalAPICBase >> 16) & 0XFF) // FIXME: adress of local APIC
+	mpconf[39] = uint8((LocalAPICBase >> 24) & 0XFF) // FIXME: adress of local APIC
+	mpconf[40] = 0                                   // extended table length
+	mpconf[42] = 0                                   // extended table checksum
+	mpconf[43] = 0                                   // reserved
+
+	// processor table entry (struct mpproc)
+	mpconf[44] = 0 // entry type(0)
+	mpconf[45] = 1 // FIXME: local APIC id
+	mpconf[46] = 1 // local APIC version
+	mpconf[47] = 0 // CPU flags
+	mpconf[48] = 0 // CPU signature
+	mpconf[49] = 0 // CPU signature
+	mpconf[50] = 0 // CPU signature
+	mpconf[51] = 0 // CPU signature
+	mpconf[52] = 0 // feature flags from CPUID instruction
+	mpconf[53] = 0 // feature flags from CPUID instruction
+	mpconf[54] = 0 // feature flags from CPUID instruction
+	mpconf[55] = 0 // feature flags from CPUID instruction
+	mpconf[56] = 0 // reserved
+	mpconf[57] = 0 // reserved
+	mpconf[58] = 0 // reserved
+	mpconf[59] = 0 // reserved
+	mpconf[60] = 0 // reserved
+	mpconf[61] = 0 // reserved
+	mpconf[62] = 0 // reserved
+	mpconf[63] = 0 // reserved
+
+	// I/O APIC table entry (struct mpioapic)
+	mpconf[64] = 2 // entry type(2)
+	mpconf[65] = 1 // I/O APIC id
+	mpconf[66] = 1 // I/O APIC version
+	mpconf[67] = 0 // I/O APIC flags
+	mpconf[68] = 0 // FIXME: I/O APIC address
+	mpconf[69] = 0 // FIXME: I/O APIC address
+	mpconf[70] = 0 // FIXME: I/O APIC address
+	mpconf[71] = 0 // FIXME: I/O APIC address
+
+	// setup checksum for (struct mpconf)
+	s := uint8(0)
+	for i := uint32(0); i < uint32(mpconf[4]); i++ {
+		s = s + mpconf[i]
+	}
+	mpconf[7] = uint8(0 - s)
+	return mpconf
 }
 
 func getEBDA() [16]byte {
@@ -138,29 +204,10 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	}
 
 	// setup (struct mpconf) at MpConfigTableBase
-	e.memory[MpConfigTableBase+0] = 'P' // signature PCMP
-	e.memory[MpConfigTableBase+1] = 'C'
-	e.memory[MpConfigTableBase+2] = 'M'
-	e.memory[MpConfigTableBase+3] = 'P'
-	e.memory[MpConfigTableBase+4] = 44 // FIXME: length
-	e.memory[MpConfigTableBase+5] = 0
-	e.memory[MpConfigTableBase+6] = 1  // version
-	e.memory[MpConfigTableBase+7] = 0  // FIXME: checksum
-	e.memory[MpConfigTableBase+8] = 0  // product id (uchar [20])
-	e.memory[MpConfigTableBase+28] = 0 // OEM table pointer
-	e.memory[MpConfigTableBase+32] = 0 // OEM OEM table length
-	e.memory[MpConfigTableBase+34] = 0 // entry count
-	e.memory[MpConfigTableBase+36] = 0 // adress of local APIC
-	e.memory[MpConfigTableBase+40] = 0 // extended table length
-	e.memory[MpConfigTableBase+42] = 0 // extended table checksum
-	e.memory[MpConfigTableBase+43] = 0 // reserved
-
-	// setup checksum for (struct mpconf)
-	s := uint8(0)
-	for i := uint32(0); i < uint32(e.memory[MpConfigTableBase+4]); i++ {
-		s = s + e.memory[EBDABase+i]
+	for i, val := range getMpConf() {
+		e.memory[MpConfigTableBase+uint32(i)] = val
 	}
-	e.memory[MpConfigTableBase+7] = uint8(0 - s)
+
 	return e
 }
 
@@ -528,7 +575,8 @@ func (e *Emulator) code0f() {
 	MovzxR32Rm16 := func() {
 		m := e.parseModRM()
 		// fmt.Printf("m.disp32=0x%x\n", m.disp32)
-		e.setRegister32(m.opecode, uint32(e.getMemory16(m.disp32)))
+		// e.setRegister32(m.opecode, uint32(e.getMemory16(m.disp32)))
+		e.setRegister32(m.opecode, uint32(e.getRm16(m)))
 	}
 	MovsxR32Rm8 := func() {
 		m := e.parseModRM()
@@ -880,7 +928,7 @@ func (e *Emulator) codeFf() {
 	}
 	jmpRm32 := func(e *Emulator, m ModRM) {
 		address := e.getRm32(m)
-		// fmt.Printf("address=0x%x\n", address)
+		fmt.Printf("jmpRm32 address=0x%x\n", address)
 		e.eip = address
 	}
 	e.eip++
