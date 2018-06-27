@@ -928,7 +928,8 @@ func (e *Emulator) codeFf() {
 	}
 	jmpRm32 := func(e *Emulator, m ModRM) {
 		address := e.getRm32(m)
-		fmt.Printf("jmpRm32 address=0x%x\n", address)
+		// address := e.calcMemoryAddress32(m)
+		// fmt.Printf("jmpRm32 address=0x%x address2=0x%x\n", address, e.getMemory32(address))
 		e.eip = address
 	}
 	e.eip++
@@ -1890,7 +1891,7 @@ type ModRM struct {
 	// disp32Sib uint32 // disp32 for sib
 }
 
-func (m *ModRM) getSib(e *Emulator) uint32 {
+func (m *ModRM) getSib(e *Emulator) uint32 { // Indicate [--][--]
 	if m.mod < 3 && m.rm == 4 {
 		base := uint8(m.sib & 0x7)
 		index := uint8((m.sib >> 3) & 0x7)
@@ -1898,15 +1899,20 @@ func (m *ModRM) getSib(e *Emulator) uint32 {
 
 		// calc base value
 		var result uint32
-		if m.mod == 2 {
-			result = e.getRegister32(base)
-		} else if m.mod == 1 {
-			result = e.getRegister32(base)
-		} else if base == 5 {
+		if base == 5 && m.mod == 0 {
 			result = m.disp32
 		} else {
 			result = e.getRegister32(base)
 		}
+		// if m.mod == 2 {
+		// 	result = e.getRegister32(base)
+		// } else if m.mod == 1 {
+		// 	result = e.getRegister32(base)
+		// } else if base == 5 {
+		// 	result = m.disp32
+		// } else {
+		// 	result = e.getRegister32(base)
+		// }
 
 		// index
 		if index != 4 {
@@ -1976,11 +1982,14 @@ func (e *Emulator) parseModRM() ModRM {
 			// fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
 		}
 
-		if (m.mod == 0 && m.rm == 5) || m.mod == 2 {
+		if (m.mod == 0 && m.rm == 5) || m.mod == 2 || (m.mod == 0 && m.rm == 4 && m.sib&0x7 == 0x5) || (m.mod == 2 && m.rm == 4 && m.sib&0x7 == 0x5) {
+			// The last two condition are as below:
+			// [scaled index] + disp32
+			// [scaled index] + disp32 + [EBP]
 			// fmt.Printf("get disp32 from eip=0x%x\n", e.eip)
 			m.disp32 = e.getCode32(0)
 			e.eip += 4
-		} else if m.mod == 1 {
+		} else if m.mod == 1 || (m.mod == 1 && m.rm == 4 && m.sib&0x7 == 0x5) {
 			m.setDisp8(e.getSignCode8(0))
 			e.eip++
 		}
