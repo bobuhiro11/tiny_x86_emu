@@ -274,6 +274,8 @@ func (e *Emulator) execInst() error {
 		} else {
 			e.pushImm16()
 		}
+	case 0x69:
+		e.imulR32Rm32Imm32()
 	case 0x6a:
 		e.pushImm8()
 	case 0x6d:
@@ -313,7 +315,8 @@ func (e *Emulator) execInst() error {
 	case 0x7F:
 		e.jg()
 	case 0x80:
-		e.orRm8Imm8()
+		e.code80()
+		// e.orRm8Imm8()
 	case 0x81:
 		e.code81()
 	case 0x83:
@@ -807,6 +810,45 @@ func (e *Emulator) code81() {
 	}
 }
 
+func (e *Emulator) code80() {
+	// cmpRm32Imm8 := func(e *Emulator, m ModRM) {
+	// 	rm32 := e.getRm32(m)
+	// 	imm8 := uint32(e.getSignCode8(0))
+	// 	e.eip++
+	// 	result := uint64(rm32) - uint64(imm8)
+	// 	e.eflags.updateBySub(rm32, imm8, result)
+	// }
+	orRm8Imm8 := func(e *Emulator, m ModRM) {
+		imm8 := e.getCode8(0)
+		e.eip++
+		e.setRm8(m, imm8)
+	}
+	cmpRm8Imm8 := func(e *Emulator, m ModRM) {
+		imm8 := e.getCode8(0)
+		rm8 := e.getRm8(m)
+		e.eip++
+		result := uint16(rm8) - uint16(imm8)
+		e.eflags.updateBySub8(rm8, imm8, result)
+	}
+
+	e.eip++
+	m := e.parseModRM()
+
+	if e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+		e.genuineProtectedEnable == true && e.operandSizeOverride == true {
+		panic("16bit mode is not implemented")
+	}
+
+	switch m.opecode {
+	case 1:
+		orRm8Imm8(e, m)
+	case 7:
+		cmpRm8Imm8(e, m)
+	default:
+		panic(fmt.Sprintf("EIP=0x%x opecode = %d\n", e.eip, m.opecode) + "not implemented")
+	}
+}
+
 func (e *Emulator) code83() {
 	subRm32Imm8 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
@@ -1022,6 +1064,16 @@ func (e *Emulator) orR32Rm32() {
 	e.setR32(m, r32|rm32)
 }
 
+func (e *Emulator) imulR32Rm32Imm32() {
+	e.eip++
+	m := e.parseModRM()
+	rm32 := e.getRm32(m)
+	imm32 := e.getCode32(0)
+	e.eip += 4
+	e.setR32(m, rm32*imm32)
+	// e.eflags.updateByImul(rm32, imm32, rm32*imm32) // FIXME
+}
+
 func (e *Emulator) addR32Rm32() {
 	e.eip++
 	m := e.parseModRM()
@@ -1136,15 +1188,6 @@ func (e *Emulator) testRm8R8() {
 	e.eflags.unset(OverflowFlag)
 	e.eflags.updatePF(uint8(result & 0xFF))
 	e.eflags.setVal(SignFlag, result&0x80 != 0)
-}
-
-func (e *Emulator) orRm8Imm8() {
-	e.eip++
-	m := e.parseModRM()
-	value := e.getCode8(0)
-	e.eip++
-
-	e.setRm8(m, value)
 }
 
 func (e *Emulator) testRm8Imm8() {
