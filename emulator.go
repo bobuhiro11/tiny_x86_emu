@@ -823,6 +823,11 @@ func (e *Emulator) code80() {
 		e.eip++
 		e.setRm8(m, imm8)
 	}
+	andRm8Imm8 := func(e *Emulator, m ModRM) {
+		imm8 := e.getCode8(0)
+		e.eip++
+		e.setRm8(m, imm8)
+	}
 	cmpRm8Imm8 := func(e *Emulator, m ModRM) {
 		imm8 := e.getCode8(0)
 		rm8 := e.getRm8(m)
@@ -842,6 +847,8 @@ func (e *Emulator) code80() {
 	switch m.opecode {
 	case 1:
 		orRm8Imm8(e, m)
+	case 4:
+		andRm8Imm8(e, m)
 	case 7:
 		cmpRm8Imm8(e, m)
 	default:
@@ -1764,7 +1771,22 @@ func (e *Emulator) v2p(vaddress uint32) uint32 {
 }
 
 func (e *Emulator) setMemory8(address uint32, value uint8) {
-	e.memory[e.v2p(address)] = value
+	paddr := e.v2p(address)
+	e.memory[paddr] = value
+
+	// Memory mapped I/O
+	// TODO: Use paddr
+	const (
+		SVR   = 0x00F0
+		TIMER = 0x0320
+		TICR  = 0x0380
+		TDCR  = 0x03E0
+	)
+	if address == LocalAPICBase+SVR+1 && value&0x01 == 0x01 {
+		fmt.Printf("Local APIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
+	} else if address == LocalAPICBase+TIMER+2 && value&0x02 == 0x02 {
+		fmt.Printf("Timer PERIODIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
+	}
 }
 
 func (e *Emulator) setMemory16(address uint32, value uint16) {
