@@ -110,7 +110,8 @@ func main() {
 	// for e.eip < 0x7c00+0x200000 {
 	i := 0
 	for {
-		if !*silent && 0x80103058 < e.eip && e.eip < 0x8010306e {
+		// if !*silent && 0x8010376c < e.eip && e.eip < 0x801037d1 {
+		if false {
 			// if !*silent && i > 3635000 {
 			e.dump(i)
 		}

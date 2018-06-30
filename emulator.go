@@ -819,14 +819,18 @@ func (e *Emulator) code80() {
 	// 	e.eflags.updateBySub(rm32, imm8, result)
 	// }
 	orRm8Imm8 := func(e *Emulator, m ModRM) {
+		rm8 := e.getRm8(m)
 		imm8 := e.getCode8(0)
 		e.eip++
-		e.setRm8(m, imm8)
+		e.setRm8(m, rm8|imm8)
+		e.eflags.updateByAndOr8(rm8 | imm8)
 	}
 	andRm8Imm8 := func(e *Emulator, m ModRM) {
+		rm8 := e.getRm8(m)
 		imm8 := e.getCode8(0)
 		e.eip++
-		e.setRm8(m, imm8)
+		e.setRm8(m, rm8&imm8)
+		e.eflags.updateByAndOr8(rm8 & imm8)
 	}
 	cmpRm8Imm8 := func(e *Emulator, m ModRM) {
 		imm8 := e.getCode8(0)
@@ -1770,18 +1774,21 @@ func (e *Emulator) v2p(vaddress uint32) uint32 {
 	return paddress
 }
 
+// Memory mapped I/O
+// TODO: Use paddr
+const (
+	ID    = 0x0020
+	SVR   = 0x00F0
+	ICRLO = 0x0300
+	TIMER = 0x0320
+	TICR  = 0x0380
+	TDCR  = 0x03E0
+)
+
 func (e *Emulator) setMemory8(address uint32, value uint8) {
 	paddr := e.v2p(address)
 	e.memory[paddr] = value
 
-	// Memory mapped I/O
-	// TODO: Use paddr
-	const (
-		SVR   = 0x00F0
-		TIMER = 0x0320
-		TICR  = 0x0380
-		TDCR  = 0x03E0
-	)
 	if address == LocalAPICBase+SVR+1 && value&0x01 == 0x01 {
 		fmt.Printf("Local APIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
 	} else if address == LocalAPICBase+TIMER+2 && value&0x02 == 0x02 {
@@ -1804,7 +1811,14 @@ func (e *Emulator) setMemory32(address, value uint32) {
 // TODO: consider linear address transformation using DS
 func (e *Emulator) getMemory8(address uint32) uint8 {
 	// fmt.Printf("vaddr=%x paddr=%x\n", address, e.v2p(address))
-	return e.memory[e.v2p(address)]
+	paddr := e.v2p(address)
+	if LocalAPICBase+ICRLO <= address && address <= LocalAPICBase+ICRLO+3 {
+		fmt.Printf("synched ICRLO = 0\n")
+		e.memory[paddr] = 0
+	} else if LocalAPICBase+ID+3 == address {
+		e.memory[paddr] = 1
+	}
+	return e.memory[paddr]
 }
 
 func (e *Emulator) getMemory16(address uint32) uint16 {

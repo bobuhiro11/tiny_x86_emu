@@ -54,6 +54,15 @@ func (ef *Eflags) updateBySub8(v1, v2 uint8, result uint16) {
 		(sign1 == 0 && sign2 == 1 && signr == 1) || (sign1 == 1 && sign2 == 0 && signr == 0))
 }
 
+func (ef *Eflags) updateByAndOr8(result uint8) {
+	ef.setVal(OverflowFlag, false)
+	ef.setVal(CarryFlag, false)
+	ef.setVal(SignFlag, (result>>7) != 0)
+	ef.setVal(ZeroFlag, result == 0)
+	popcnt := bits.OnesCount8(result)
+	ef.setVal(ParityFlag, popcnt%2 == 0)
+}
+
 func (ef *Eflags) updateBySub(v1, v2 uint32, result uint64) {
 	sign1 := (v1 >> 31) & 0x01
 	sign2 := (v2 >> 31) & 0x01
