@@ -62,6 +62,7 @@ const (
 	EBDABase          = uint32(0x600) // address of struct mp
 	MpConfigTableBase = uint32(0x700) // TODO: address of struct mpconf,need check
 	LocalAPICBase     = uint32(0xFEC80000)
+	IOAPICBase        = uint32(0xFEC00000)
 )
 
 // Emulator is an i386 Virtual Machine
@@ -130,14 +131,14 @@ func getMpConf() [72]byte {
 	mpconf[63] = 0 // reserved
 
 	// I/O APIC table entry (struct mpioapic)
-	mpconf[64] = 2 // entry type(2)
-	mpconf[65] = 1 // I/O APIC id
-	mpconf[66] = 1 // I/O APIC version
-	mpconf[67] = 0 // I/O APIC flags
-	mpconf[68] = 0 // FIXME: I/O APIC address
-	mpconf[69] = 0 // FIXME: I/O APIC address
-	mpconf[70] = 0 // FIXME: I/O APIC address
-	mpconf[71] = 0 // FIXME: I/O APIC address
+	mpconf[64] = 2                                // entry type(2)
+	mpconf[65] = 1                                // I/O APIC id
+	mpconf[66] = 1                                // I/O APIC version
+	mpconf[67] = 0                                // I/O APIC flags
+	mpconf[68] = uint8((IOAPICBase >> 0) & 0XFF)  // I/O APIC address
+	mpconf[69] = uint8((IOAPICBase >> 8) & 0XFF)  // I/O APIC address
+	mpconf[70] = uint8((IOAPICBase >> 16) & 0XFF) // I/O APIC address
+	mpconf[71] = uint8((IOAPICBase >> 24) & 0XFF) // I/O APIC address
 
 	// setup checksum for (struct mpconf)
 	s := uint8(0)
@@ -806,7 +807,7 @@ func (e *Emulator) code81() {
 	case 7:
 		cmpRm32Imm32(e, m)
 	default:
-		panic(fmt.Sprintf("opecode = %d\n", m.opecode) + "not implemented")
+		panic(fmt.Sprintf("code=81 opecode=%d ", m.opecode) + "not implemented")
 	}
 }
 
@@ -1785,6 +1786,10 @@ const (
 	TDCR  = 0x03E0
 )
 
+var (
+	ioapicData uint32
+)
+
 func (e *Emulator) setMemory8(address uint32, value uint8) {
 	paddr := e.v2p(address)
 	e.memory[paddr] = value
@@ -1803,6 +1808,10 @@ func (e *Emulator) setMemory16(address uint32, value uint16) {
 }
 
 func (e *Emulator) setMemory32(address, value uint32) {
+	if address == IOAPICBase && value == 0x00 {
+		ioapicData = 1 << 24
+		fmt.Printf("ioapic read is called. I have to return ioapicid\n")
+	}
 	for i := uint32(0); i < 4; i++ {
 		e.setMemory8(address+i, uint8(value>>uint32(i*8)&0xFF))
 	}
@@ -1830,6 +1839,11 @@ func (e *Emulator) getMemory16(address uint32) uint16 {
 }
 
 func (e *Emulator) getMemory32(address uint32) uint32 {
+	if address == IOAPICBase+4*4 {
+		fmt.Printf("Return 0x%x as ioapic data\n", ioapicData)
+		return ioapicData
+	}
+
 	var ret uint32
 	for i := uint32(0); i < 4; i++ {
 		ret |= uint32(e.getMemory8(address+i)) << uint32(i*8)
