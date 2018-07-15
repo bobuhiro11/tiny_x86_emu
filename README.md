@@ -37,3 +37,30 @@ $ CGO_ENABLED=1 CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc GOOS=window
 
 ![](https://image.slidesharecdn.com/linuxintroduction-130907015640-/95/linux-introduction-29-638.jpg)
 ![](http://slideplayer.com/slide/4865857/15/images/29/32bit+Mode:+4MB+Page+Mapping.jpg)
+
+
+- xv6カーネルでは、以下の手順でカーネルメモリを初期化している
+  - main() -> kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); -> freerange(vstart, vend); -> kfree(p); -> memset(v, 1, PGSIZE); -> `stosl(dst, (c<<24)|(c<<16)|(c<<8)|c, n/4);`
+  - memsetの引数は、dst=0x80400000 c=1 n=4096となっていた
+  - また、stolsカンスの引数は、stosl start. addr=0x80400000 data=16843009 cnt=1024 だった
+  - ここで、stosl命令、アセンブリではf3 ab rep stos %eax,%es:(%edi)に対応する
+- このときに、エミュレータには、以下の出力が出ていた。本来stosd命令が1024回繰り返されるはずだが、実際には残り512回のところで実行エラーになってしまった。
+- よく見ると、repeat 512のとき、0x80400800(0x800)番地をいじっているため、その次のeipに対するV2Pがおかしい
+- pdtentry=0x800なので、上記と完全に一致してしまっている。。。
+- pdtentryの場所がおかしいのか？？
+
+```text 
+repeat 514 times. eip=0x80104601 code=0xab
+  stosd address=0x804007f8(0x7f8) value=0x1010101
+  The exec of 514 loop finished.
+  Next eip=0x80104600(0x104600) paddr of pdtentry=0x800 code=0xf3 ecx=0x201
+repeat 513 times. eip=0x80104601 code=0xab
+  stosd address=0x804007fc(0x7fc) value=0x1010101
+  The exec of 513 loop finished.
+  Next eip=0x80104600(0x104600) paddr of pdtentry=0x800 code=0xf3 ecx=0x200
+repeat 512 times. eip=0x80104601 code=0xab
+  stosd address=0x80400800(0x800) value=0x1010101
+  The exec of 512 loop finished.
+  Next eip=0x80104600(0x1114701) paddr of pdtentry=0x800 code=0x0 ecx=0x1ff
+eip=80104600 opecode = 0 is not implemented at execInst().
+```

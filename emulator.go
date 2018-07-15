@@ -404,14 +404,22 @@ func (e *Emulator) execInst() error {
 		e.outAxDx()
 	case 0xF3:
 		// rep prefix
-		// fmt.Printf("repeat %d times.\n", e.getRegister32(ECX))
-		if e.getRegister32(ECX) > 1 {
+		ecx := e.getRegister32(ECX)
+		fmt.Printf("repeat %d times. ", ecx)
+		if ecx > 1 {
 			e.eip++
+			fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
 			e.execInst()
+			fmt.Printf("The exec of %d loop finished.\n", ecx)
 			e.decRegister32(ECX, 1)
 			e.eip -= 2
-		} else if e.getRegister32(ECX) == 1 {
+			fmt.Printf("Next eip=0x%x(0x%x) paddr of pdtentry=0x%x code=0x%x ecx=0x%x\n",
+				e.eip, e.v2p(e.eip),
+				(e.cr[3]>>22)+4*(e.eip>>22),
+				e.getCode8(0), e.getRegister32(ECX))
+		} else if ecx == 1 {
 			e.eip++
+			fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
 			e.execInst()
 			e.decRegister32(ECX, 1)
 		} else {
@@ -430,7 +438,7 @@ func (e *Emulator) execInst() error {
 	case 0xFF:
 		e.codeFf()
 	default:
-		return errors.New(fmt.Sprintf("eip=%x opecode = %x is not implemented.", e.eip, e.getCode8(0)))
+		return errors.New(fmt.Sprintf("eip=%x opecode = %x is not implemented at execInst().", e.eip, e.getCode8(0)))
 	}
 	return nil
 }
@@ -454,6 +462,7 @@ func (e *Emulator) stosb() {
 func (e *Emulator) stosd() {
 	address := e.getRegister32(EDI)
 	value := e.getRegister32(EAX)
+	fmt.Printf("stodsd address=0x%x(0x%x) value=0x%x\n", address, e.v2p(address), value)
 	e.setMemory32(address, value)
 	if e.eflags.isEnable(DirectionFlag) {
 		e.decRegister32(EDI, 4)
@@ -781,6 +790,14 @@ func (e *Emulator) code81() {
 		result := uint64(rm32) & uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
+	orRm32Imm32 := func(e *Emulator, m ModRM) {
+		rm32 := e.getRm32(m)
+		imm32 := e.getCode32(0)
+		e.eip += 4
+		// fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		result := uint64(rm32) | uint64(imm32)
+		e.setRm32(m, uint32(result))
+	}
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
@@ -802,12 +819,14 @@ func (e *Emulator) code81() {
 	switch m.opecode {
 	case 0:
 		addRm32Imm32(e, m)
+	case 1:
+		orRm32Imm32(e, m)
 	case 4:
 		andRm32Imm32(e, m)
 	case 7:
 		cmpRm32Imm32(e, m)
 	default:
-		panic(fmt.Sprintf("code=81 opecode=%d ", m.opecode) + "not implemented")
+		panic(fmt.Sprintf("EIP=0x%x code=81 opecode=%d ", e.eip, m.opecode) + "not implemented")
 	}
 }
 
