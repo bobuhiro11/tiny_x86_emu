@@ -64,3 +64,34 @@ repeat 512 times. eip=0x80104601 code=0xab
   Next eip=0x80104600(0x1114701) paddr of pdtentry=0x800 code=0x0 ecx=0x1ff
 eip=80104600 opecode = 0 is not implemented at execInst().
 ```
+
+- ということで、もうすこし調べてみる
+- kinit1は、カーネルELFバイナリの最後のアドレス`end`から4MBを初期化する
+  - 仮想アドレスでは、0x801154a8 ~ 0x80400000 の範囲になる
+  - これは初期状態ではページテーブルを4MBしか用意していないため
+- kinit2では、4MBからPHYSTOP 4GBを初期化する
+  - 仮想アドレスでは、0x80400000 ~ 0x8e000000 の範囲になる
+- vm.c のkmapのコメントが詳しい
+
+```
+// setupkvm() and exec() set up every page table like this:
+//
+//   0..KERNBASE: user memory (text+data+stack+heap), mapped to
+//                phys memory allocated by the kernel
+//   KERNBASE..KERNBASE+EXTMEM: mapped to 0..EXTMEM (for I/O space)
+//   KERNBASE+EXTMEM..data: mapped to EXTMEM..V2P(data)
+//                for the kernel's instructions and r/o data
+//   data..KERNBASE+PHYSTOP: mapped to V2P(data)..PHYSTOP,
+//                                  rw data + free physical memory
+//   0xfe000000..0: mapped direct (devices such as ioapic)
+
+
+// vm.cのL.29あたりのlgdtで設定されるべき内容が空になってしまっている
+GDTEntry[0]={entryPhysAddr=0x0 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
+GDTEntry[1]={entryPhysAddr=0x8 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
+GDTEntry[2]={entryPhysAddr=0x10 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
+GDTEntry[3]={entryPhysAddr=0x18 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
+GDTEntry[4]={entryPhysAddr=0x20 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
+GDTEntry[5]={entryPhysAddr=0x28 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
+
+```

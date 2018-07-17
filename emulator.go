@@ -546,11 +546,17 @@ func (e *Emulator) codeF7() {
 func (e *Emulator) code0f() {
 	lgdt := func() {
 		m := e.parseModRM()
-		address := uint32(e.calcMemoryAddress16(m))
+
+		address := e.calcMemoryAddress32(m) // 32bit mode
+		if e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
+			e.genuineProtectedEnable == true && e.operandSizeOverride == true {
+			address = uint32(e.calcMemoryAddress16(m)) // 16bit mode
+		}
 		e.gdtrSize = e.getMemory16(address)
 		e.gdtrBase = e.getMemory32(address + 2)
 		fmt.Printf("address=0x%x gdtrSize=0x%x gdtrBase=0x%x\n",
 			address, e.gdtrSize, e.gdtrBase)
+
 		e.dumpGDTEntry(e.gdtrBase)
 		e.dumpGDTEntry(e.gdtrBase + 0x8)
 		e.dumpGDTEntry(e.gdtrBase + 0x10)
