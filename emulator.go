@@ -81,6 +81,7 @@ type Emulator struct {
 	io                     IO
 	operandSizeOverride    bool              // true if operand size override (0x66) is enabled
 	genuineProtectedEnable bool              // procted mode is refreshed only when sreg is changed
+	PageSizeExtensionEable bool              // CR4PageSizeExtension Enable
 	disasm                 map[uint64]string // disasmed code (ex. 32255 -> "0000 add [bx+si],al")
 }
 
@@ -405,21 +406,21 @@ func (e *Emulator) execInst() error {
 	case 0xF3:
 		// rep prefix
 		ecx := e.getRegister32(ECX)
-		fmt.Printf("repeat %d times. ", ecx)
+		// fmt.Printf("repeat %d times. ", ecx)
 		if ecx > 1 {
 			e.eip++
-			fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
+			// fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
 			e.execInst()
-			fmt.Printf("The exec of %d loop finished.\n", ecx)
+			// fmt.Printf("The exec of %d loop finished.\n", ecx)
 			e.decRegister32(ECX, 1)
 			e.eip -= 2
-			fmt.Printf("Next eip=0x%x(0x%x) paddr of pdtentry=0x%x code=0x%x ecx=0x%x\n",
-				e.eip, e.v2p(e.eip),
-				(e.cr[3]>>22)+4*(e.eip>>22),
-				e.getCode8(0), e.getRegister32(ECX))
+			// fmt.Printf("Next eip=0x%x(0x%x) paddr of pdtentry=0x%x code=0x%x ecx=0x%x\n",
+			// 	e.eip, e.v2p(e.eip),
+			// 	(e.cr[3]>>22)+4*(e.eip>>22),
+			// 	e.getCode8(0), e.getRegister32(ECX))
 		} else if ecx == 1 {
 			e.eip++
-			fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
+			// fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
 			e.execInst()
 			e.decRegister32(ECX, 1)
 		} else {
@@ -438,7 +439,7 @@ func (e *Emulator) execInst() error {
 	case 0xFF:
 		e.codeFf()
 	default:
-		return errors.New(fmt.Sprintf("eip=%x opecode = %x is not implemented at execInst().", e.eip, e.getCode8(0)))
+		return errors.New(fmt.Sprintf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst().", e.eip, e.v2p(e.eip), e.getCode8(0)))
 	}
 	return nil
 }
@@ -462,7 +463,7 @@ func (e *Emulator) stosb() {
 func (e *Emulator) stosd() {
 	address := e.getRegister32(EDI)
 	value := e.getRegister32(EAX)
-	fmt.Printf("stodsd address=0x%x(0x%x) value=0x%x\n", address, e.v2p(address), value)
+	// fmt.Printf("stodsd address=0x%x(0x%x) value=0x%x\n", address, e.v2p(address), value)
 	e.setMemory32(address, value)
 	if e.eflags.isEnable(DirectionFlag) {
 		e.decRegister32(EDI, 4)
@@ -553,7 +554,7 @@ func (e *Emulator) code0f() {
 			address = uint32(e.calcMemoryAddress16(m)) // 16bit mode
 		}
 		e.gdtrSize = e.getMemory16(address)
-		e.gdtrBase = e.getMemory32(address + 2)
+		e.gdtrBase = e.v2p(e.getMemory32(address + 2))
 		fmt.Printf("address=0x%x gdtrSize=0x%x gdtrBase=0x%x\n",
 			address, e.gdtrSize, e.gdtrBase)
 
@@ -574,14 +575,23 @@ func (e *Emulator) code0f() {
 		// e.cr[m.opecode] = e.getR32(m)
 		e.cr[m.opecode] = e.getRm32(m)
 		// fmt.Printf("%d %d\n", m.opecode, e.cr[m.opecode])
-		if m.opecode == 4 && e.cr[m.opecode]&CR4PageSizeExtension != 0 {
-			fmt.Printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
-		} else if m.opecode == 3 {
+		// if m.opecode == 4 && e.cr[m.opecode]&CR4PageSizeExtension != 0 {
+		if m.opecode == 3 {
+			if e.cr[4]&CR4PageSizeExtension != 0 {
+				fmt.Printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
+				e.PageSizeExtensionEable = true
+			} else {
+				fmt.Printf("CR4 page size sxtension Disabled (Page size is 4KB).\n")
+				e.PageSizeExtensionEable = false
+			}
+			e.cr[4] &^= CR4PageSizeExtension
 			fmt.Printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode]>>12)
 			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
 				0, e.getMemory32((e.cr[m.opecode]>>22)+4*0))
 			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
 				512, e.getMemory32((e.cr[m.opecode]>>22)+4*512))
+			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
+				513, e.getMemory32((e.cr[m.opecode]>>22)+4*513))
 		} else if m.opecode == 0 && e.cr[m.opecode]&CR0PagingFlag != 0 {
 			fmt.Printf("CR0 paging is Enabled.\n")
 		}
@@ -1786,15 +1796,18 @@ func (e *Emulator) decRegister32(rm uint8, value uint32) {
 
 func (e *Emulator) v2p(vaddress uint32) uint32 {
 	var paddress uint32
-	if (e.cr[0]&CR0PagingFlag != 0) && (e.cr[4]&CR4PageSizeExtension != 0) {
+	if (e.cr[0]&CR0PagingFlag != 0) && e.PageSizeExtensionEable {
 		// paing
 		var pdtEntry uint32
 		for i := uint32(0); i < 4; i++ {
 			pdtEntry |= uint32(e.memory[(e.cr[3]>>22)+4*(vaddress>>22)+i]) << uint32(i*8)
 		}
-		// fmt.Printf("pdtEntry=0x%x index=%d offset=0x%x\n", pdtEntry, vaddress>>22, vaddress&0x3FFFFF)
-		paddress = pdtEntry + vaddress&0x3FFFFF
+		paddress = pdtEntry + vaddress&0x003FFFFF
+		if vaddress-paddress != 0 && vaddress-paddress != 0x80000000 {
+			fmt.Printf("pdtEntry=0x%x index=%d offset=0x%x vaddress=0x%x paddress=pdtEntry+offset=0x%x\n", pdtEntry, vaddress>>22, vaddress&0x003FFFFF, vaddress, paddress)
+		}
 	} else {
+		// fmt.Printf("PageSizeExtension is disabled.\n")
 		paddress = vaddress
 	}
 	return paddress

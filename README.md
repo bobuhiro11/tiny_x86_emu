@@ -72,6 +72,7 @@ eip=80104600 opecode = 0 is not implemented at execInst().
 - kinit2では、4MBからPHYSTOP 4GBを初期化する
   - 仮想アドレスでは、0x80400000 ~ 0x8e000000 の範囲になる
 - vm.c のkmapのコメントが詳しい
+- xv6はSuper Pagesを1箇所でのみ: 初期ページテーブルでのみ利用している(1311行目)。配列の初期化処理では、1024個のPDEのうち2つを設定しており、インデックスが0と512(KERNBASE>>PDXSHIFT)に相当する場所を設定している。それ以外の場所はゼロに設定している。xv6はこれらの2つのPDEをPTE_PSと設定することにより、これらがSuperPagesであることを設定している。カーネルはさらに、CR_PSEビット(ページサイズ拡張)を%cr4に設定することでハードウェアに対してSuperPagesを利用できることを通知している
 
 ```
 // setupkvm() and exec() set up every page table like this:
