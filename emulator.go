@@ -1797,14 +1797,30 @@ func (e *Emulator) decRegister32(rm uint8, value uint32) {
 func (e *Emulator) v2p(vaddress uint32) uint32 {
 	var paddress uint32
 	if (e.cr[0]&CR0PagingFlag != 0) && e.PageSizeExtensionEable {
-		// paing
+		// 4MB paging (super page)
 		var pdtEntry uint32
 		for i := uint32(0); i < 4; i++ {
-			pdtEntry |= uint32(e.memory[(e.cr[3]>>22)+4*(vaddress>>22)+i]) << uint32(i*8)
+			pdtEntry |= uint32(e.memory[(e.cr[3]&0xFFC00000)+4*(vaddress>>22)+i]) << uint32(i*8)
 		}
-		paddress = pdtEntry + vaddress&0x003FFFFF
+		paddress = pdtEntry&0xFFC00000 + vaddress&0x003FFFFF
 		if vaddress-paddress != 0 && vaddress-paddress != 0x80000000 {
-			fmt.Printf("pdtEntry=0x%x index=%d offset=0x%x vaddress=0x%x paddress=pdtEntry+offset=0x%x\n", pdtEntry, vaddress>>22, vaddress&0x003FFFFF, vaddress, paddress)
+			fmt.Printf("pdtEntry=0x%x index=%d offset=0x%x vaddress=0x%x paddress=pdtEntry+offset=0x%x\n",
+				pdtEntry, vaddress>>22, vaddress&0x003FFFFF, vaddress, paddress)
+		}
+	} else if e.cr[0]&CR0PagingFlag != 0 {
+		// 4KB paging
+		var pdtEntry uint32
+		for i := uint32(0); i < 4; i++ {
+			pdtEntry |= uint32(e.memory[(e.cr[3]&0xFFFFF000)+4*(vaddress>>22)+i]) << uint32(i*8)
+		}
+		var ptEntry uint32
+		for i := uint32(0); i < 4; i++ {
+			ptEntry |= uint32(e.memory[(pdtEntry&0xFFFFF000)+4*((vaddress>>12)&0x3FF)+i]) << uint32(i*8)
+		}
+		paddress = ptEntry&0xFFFFF000 + vaddress&0xFFF
+		if vaddress-paddress != 0 && vaddress-paddress != 0x80000000 {
+			fmt.Printf("PDE base=0x%x PTE base=0x%x PDT index=%d PT index=%d vaddress=0x%x paddress=0x%x\n",
+				e.cr[3]&0xFFFFF000, pdtEntry&0xFFFFF000, vaddress>>22, (vaddress>>12)&0x3FF, vaddress, paddress)
 		}
 	} else {
 		// fmt.Printf("PageSizeExtension is disabled.\n")
