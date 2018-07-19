@@ -63,19 +63,21 @@ const (
 	MpConfigTableBase = uint32(0x700) // TODO: address of struct mpconf,need check
 	LocalAPICBase     = uint32(0xFEC80000)
 	IOAPICBase        = uint32(0xFEC00000)
+	PHYSTOP           = uint32(0xE000000)
+	DEVSPACE          = uint32(0xFE000000)
 )
 
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
-	registers              [8]uint32        // general registers
-	cr                     [16]uint32       // controll registers
-	sreg                   [6]uint32        // segment registers
-	eflags                 Eflags           // eflags
-	gdtrSize               uint16           // global table descriptor table's size
-	gdtrBase               uint32           // global table descriptor table's base phys address
-	memory                 map[uint32]uint8 // physical memory
-	eip                    uint32           // program counter
-	isSilent               bool             // silent mode
+	registers              [8]uint32  // general registers
+	cr                     [16]uint32 // controll registers
+	sreg                   [6]uint32  // segment registers
+	eflags                 Eflags     // eflags
+	gdtrSize               uint16     // global table descriptor table's size
+	gdtrBase               uint32     // global table descriptor table's base phys address
+	memory                 []uint8    // physical memory
+	eip                    uint32     // program counter
+	isSilent               bool       // silent mode
 	reader                 io.Reader
 	writer                 io.Writer
 	io                     IO
@@ -177,7 +179,7 @@ func getEBDA() [16]byte {
 // NewEmulator creates New Emulator
 func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, reader io.Reader, writer io.Writer, disasm map[uint64]string) *Emulator {
 	e := &Emulator{
-		memory:   map[uint32]uint8{},
+		memory:   make([]uint8, PHYSTOP),
 		eip:      eip,
 		isSilent: isSilent,
 		reader:   reader,
@@ -1846,13 +1848,19 @@ var (
 
 func (e *Emulator) setMemory8(address uint32, value uint8) {
 	paddr := e.v2p(address)
-	e.memory[paddr] = value
 
 	if address == LocalAPICBase+SVR+1 && value&0x01 == 0x01 {
 		fmt.Printf("Local APIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
+		return
 	} else if address == LocalAPICBase+TIMER+2 && value&0x02 == 0x02 {
 		fmt.Printf("Timer PERIODIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
+		return
+	} else if paddr > PHYSTOP {
+		fmt.Printf("Invalid paddress: 0x%x\n", paddr)
+		return
 	}
+
+	e.memory[paddr] = value
 }
 
 func (e *Emulator) setMemory16(address uint32, value uint16) {
@@ -1875,12 +1883,19 @@ func (e *Emulator) setMemory32(address, value uint32) {
 func (e *Emulator) getMemory8(address uint32) uint8 {
 	// fmt.Printf("vaddr=%x paddr=%x\n", address, e.v2p(address))
 	paddr := e.v2p(address)
+
 	if LocalAPICBase+ICRLO <= address && address <= LocalAPICBase+ICRLO+3 {
 		fmt.Printf("synched ICRLO = 0\n")
-		e.memory[paddr] = 0
+		// e.memory[paddr] = 0
+		return 0
 	} else if LocalAPICBase+ID+3 == address {
-		e.memory[paddr] = 1
+		// e.memory[paddr] = 1
+		return 1
+	} else if paddr > PHYSTOP {
+		fmt.Printf("Invalid paddress: 0x%x\n", paddr)
+		return 0
 	}
+
 	return e.memory[paddr]
 }
 
