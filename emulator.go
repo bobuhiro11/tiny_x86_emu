@@ -52,6 +52,8 @@ const (
 	GS = 5
 )
 
+//
+
 // Controll Register
 const (
 	CR4PageSizeExtension = 0x10
@@ -67,17 +69,31 @@ const (
 	DEVSPACE          = uint32(0xFE000000)
 )
 
+type TaskRegister struct {
+	gdtOffset uint16 // offset in GDT
+	TSSBase   uint32 // Base Address of Task State Segment
+	TSSLimit  uint32 // Size of Task Steate Segment
+}
+
+type TaskState struct {
+	esp0 uint32
+	ss0  uint16
+	iomb uint16
+}
+
 // Emulator is an i386 Virtual Machine
 type Emulator struct {
-	registers              [8]uint32  // general registers
-	cr                     [16]uint32 // controll registers
-	sreg                   [6]uint32  // segment registers
-	eflags                 Eflags     // eflags
-	gdtrSize               uint16     // global table descriptor table's size
-	gdtrBase               uint32     // global table descriptor table's base phys address
-	memory                 []uint8    // physical memory
-	eip                    uint32     // program counter
-	isSilent               bool       // silent mode
+	registers              [8]uint32    // general registers
+	cr                     [16]uint32   // controll registers
+	sreg                   [6]uint32    // segment registers
+	tr                     TaskRegister // task register
+	taskState              TaskState    // task state
+	eflags                 Eflags       // eflags
+	gdtrSize               uint16       // global table descriptor table's size
+	gdtrBase               uint32       // global table descriptor table's base phys address
+	memory                 []uint8      // physical memory
+	eip                    uint32       // program counter
+	isSilent               bool         // silent mode
 	reader                 io.Reader
 	writer                 io.Writer
 	io                     IO
@@ -325,6 +341,8 @@ func (e *Emulator) execInst() error {
 		e.code81()
 	case 0x83:
 		e.code83()
+	case 0x87:
+		e.xchg()
 	case 0x88:
 		e.movRm8R8()
 	case 0x89:
@@ -436,8 +454,13 @@ func (e *Emulator) execInst() error {
 		e.codeF7()
 	case 0xFA:
 		e.cli()
+	case 0xFB:
+		e.sti()
 	case 0xFC:
 		e.cld()
+	case 0xF0:
+		// lock
+		e.eip++
 	case 0xFF:
 		e.codeFf()
 	default:
@@ -489,6 +512,12 @@ func (e *Emulator) insd() {
 func (e *Emulator) cli() {
 	e.eflags.unset(InterruptFlag)
 	e.eip++
+}
+
+func (e *Emulator) sti() {
+	e.eflags.set(InterruptFlag)
+	e.eip++
+	fmt.Printf("Enable Interruput Flag by sti inst.\n")
 }
 
 func (e *Emulator) cld() {
@@ -549,23 +578,52 @@ func (e *Emulator) codeF7() {
 func (e *Emulator) code0f() {
 	lgdt := func() {
 		m := e.parseModRM()
-
 		address := e.calcMemoryAddress32(m) // 32bit mode
 		if e.genuineProtectedEnable == false && e.operandSizeOverride == false ||
 			e.genuineProtectedEnable == true && e.operandSizeOverride == true {
 			address = uint32(e.calcMemoryAddress16(m)) // 16bit mode
 		}
-		e.gdtrSize = e.getMemory16(address)
-		e.gdtrBase = e.v2p(e.getMemory32(address + 2))
-		fmt.Printf("address=0x%x gdtrSize=0x%x gdtrBase=0x%x\n",
-			address, e.gdtrSize, e.gdtrBase)
+		if m.opecode == 2 {
+			// LGDT
+			e.gdtrSize = e.getMemory16(address)
+			e.gdtrBase = e.v2p(e.getMemory32(address + 2))
+			fmt.Printf("lgdt: address=0x%x gdtSize=0x%x gdtBase=0x%x @emu\n",
+				address, e.gdtrSize, e.gdtrBase)
 
-		e.dumpGDTEntry(e.gdtrBase)
-		e.dumpGDTEntry(e.gdtrBase + 0x8)
-		e.dumpGDTEntry(e.gdtrBase + 0x10)
-		e.dumpGDTEntry(e.gdtrBase + 0x18)
-		e.dumpGDTEntry(e.gdtrBase + 0x20)
-		e.dumpGDTEntry(e.gdtrBase + 0x28)
+			e.dumpGDTEntry(e.gdtrBase)
+			e.dumpGDTEntry(e.gdtrBase + 0x8)
+			e.dumpGDTEntry(e.gdtrBase + 0x10)
+			e.dumpGDTEntry(e.gdtrBase + 0x18)
+			e.dumpGDTEntry(e.gdtrBase + 0x20)
+			e.dumpGDTEntry(e.gdtrBase + 0x28)
+		} else if m.opecode == 3 {
+			// LIDT
+			idtrSize := e.getMemory16(address)
+			idtrBase := e.v2p(e.getMemory32(address + 2))
+			fmt.Printf("lidt: address=0x%x idtSize=0x%x idtBase=0x%x @emu\n",
+				address, idtrSize, idtrBase)
+		} else {
+			fmt.Printf("Invalid Operation: 0x0f 0x01 but invalid opecode\n")
+		}
+	}
+	ltrRm16 := func() {
+		m := e.parseModRM()
+		e.tr.gdtOffset = e.getRm16(m)
+		// Read GDT
+		// entry := e.getMemory64(e.gdtrBase + uint32(e.tr.gdtOffset))
+		var entry uint64
+		for i := uint32(0); i < 8; i++ {
+			entry |= uint64(e.memory[e.gdtrBase+uint32(e.tr.gdtOffset)+i]) << uint32(i*8)
+		}
+
+		e.tr.TSSBase = uint32((((entry >> 56) & 0xFF) << 24) | (((entry >> 32) & 0xFF) << 16) | ((entry >> 16) & 0xFFFF))
+		e.tr.TSSLimit = uint32((((entry >> 48) & 0xF) << 16) | (entry & 0xFFFF))
+
+		e.taskState.ss0 = uint16(e.memory[e.tr.TSSBase+9])<<8 | uint16(e.memory[e.tr.TSSBase+8])
+		e.taskState.esp0 = uint32(e.memory[e.tr.TSSBase+7])<<24 | uint32(e.memory[e.tr.TSSBase+6])<<16 | uint32(e.memory[e.tr.TSSBase+5])<<8 | uint32(e.memory[e.tr.TSSBase+4])
+
+		fmt.Printf("ltrRm16: gdtEntryPhysAddr=0x%x tssBase=0x%x tssLimit=0x%x ss0=0x%x esp0=0x%x @emu\n",
+			e.gdtrBase+uint32(e.tr.gdtOffset), e.tr.TSSBase, e.tr.TSSLimit, e.taskState.ss0, e.taskState.esp0)
 	}
 	movR32Cr := func() {
 		m := e.parseModRM()
@@ -602,6 +660,13 @@ func (e *Emulator) code0f() {
 		m := e.parseModRM()
 		// e.setRegister32(m.opecode, uint32(e.getMemory8(e.calcMemoryAddress32(m))))
 		e.setRegister32(m.opecode, uint32(e.getRm8(m)))
+	}
+	cmoveR32Rm32 := func() {
+		m := e.parseModRM()
+		rm32 := e.getRm32(m)
+		if e.eflags.isEnable(ZeroFlag) {
+			e.setR32(m, rm32)
+		}
 	}
 	MovzxR32Rm16 := func() {
 		m := e.parseModRM()
@@ -664,12 +729,16 @@ func (e *Emulator) code0f() {
 
 	second := e.getCode8(1)
 	e.eip += 2
-	if second == 0x01 {
+	if second == 0x00 {
+		ltrRm16()
+	} else if second == 0x01 {
 		lgdt()
 	} else if second == 0x20 {
 		movR32Cr()
 	} else if second == 0x22 {
 		movCrR32()
+	} else if second == 0x44 {
+		cmoveR32Rm32()
 	} else if second == 0x83 {
 		jae()
 	} else if second == 0x84 {
@@ -1087,6 +1156,15 @@ func (e *Emulator) subRm32R32() {
 	r32 := e.getR32(m)
 	// fmt.Printf("rm32=0x%x r32=0x%x\n", rm32, r32)
 	e.setRm32(m, rm32-r32)
+}
+
+func (e *Emulator) xchg() {
+	e.eip++
+	m := e.parseModRM()
+	r32 := e.getR32(m)
+	rm32 := e.getRm32(m)
+	e.setR32(m, rm32)
+	e.setRm32(m, r32)
 }
 
 func (e *Emulator) orRm32R32() {
@@ -1580,10 +1658,20 @@ func (e *Emulator) outAxDx() {
 
 // dump GDT entry
 func (e *Emulator) dumpGDTEntry(physAddr uint32) {
-	entry := e.getMemory64(physAddr)
-	segmentBaseAddr := uint32((((entry >> 56) & 0xFF) << 24) | (((entry >> 32) & 0xFF) << 16) | ((entry >> 16) & 0xFFFF))
-	segmentLimit := uint32((((entry >> 48) & 0xF) << 16) | (entry & 0xFFFF))
-	isCodeSegment := (entry >> 43) & 1
+	// entry := e.getMemory64(physAddr)
+	var entry uint64
+	for i := uint32(0); i < 8; i++ {
+		entry |= uint64(e.memory[physAddr+i]) << uint32(i*8)
+	}
+
+	// segmentBaseAddr := uint32((((entry >> 56) & 0xFF) << 24) | (((entry >> 32) & 0xFF) << 16) | ((entry >> 16) & 0xFFFF))
+	// segmentLimit := uint32((((entry >> 48) & 0xF) << 16) | (entry & 0xFFFF))
+	// isCodeSegment := (entry >> 43) & 1
+
+	segmentBaseAddr := (((entry >> 56) & 0xFF) << 24) | ((entry >> 16) & 0x3FFFFF)
+	segmentLimit := ((entry >> 48) & 0xF << 16) | (entry & 0xFFFF)
+	isCodeSegment := (entry >> 44) & 1
+
 	fmt.Printf("GDTEntry[%d]={entryPhysAddr=0x%x segmentBaseAddr=0x%x segmentLimit=0x%x isCodeSegment=0x%x}\n",
 		(physAddr-e.gdtrBase)/8, physAddr, segmentBaseAddr, segmentLimit, isCodeSegment)
 }
@@ -1821,8 +1909,8 @@ func (e *Emulator) v2p(vaddress uint32) uint32 {
 		}
 		paddress = ptEntry&0xFFFFF000 + vaddress&0xFFF
 		if vaddress-paddress != 0 && vaddress-paddress != 0x80000000 {
-			fmt.Printf("PDE base=0x%x PTE base=0x%x PDT index=%d PT index=%d vaddress=0x%x paddress=0x%x\n",
-				e.cr[3]&0xFFFFF000, pdtEntry&0xFFFFF000, vaddress>>22, (vaddress>>12)&0x3FF, vaddress, paddress)
+			// fmt.Printf("PDE base=0x%x PTE base=0x%x PDT index=%d PT index=%d vaddress=0x%x paddress=0x%x\n",
+			// 	e.cr[3]&0xFFFFF000, pdtEntry&0xFFFFF000, vaddress>>22, (vaddress>>12)&0x3FF, vaddress, paddress)
 		}
 	} else {
 		// fmt.Printf("PageSizeExtension is disabled.\n")
@@ -1892,7 +1980,7 @@ func (e *Emulator) getMemory8(address uint32) uint8 {
 		// e.memory[paddr] = 1
 		return 1
 	} else if paddr > PHYSTOP {
-		fmt.Printf("Invalid paddress: 0x%x\n", paddr)
+		// fmt.Printf("Invalid paddress: 0x%x\n", paddr)
 		return 0
 	}
 

@@ -96,3 +96,5 @@ GDTEntry[4]={entryPhysAddr=0x20 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegme
 GDTEntry[5]={entryPhysAddr=0x28 segmentBaseAddr=0x0 segmentLimit=0x0 isCodeSegment=0x0}
 
 ```
+
+![](https://pdos.csail.mit.edu/6.828/2012/readings/i386/fig7-3.gif)
