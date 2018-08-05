@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	// "bufio"
 	"fmt"
 	"io"
 	"os"
@@ -47,8 +47,9 @@ func (io *IO) in8(address uint16) uint8 {
 		}
 		times0x01f7++
 	case 0x03f8: // COM1+0: Reciever Buffer Register
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
+		// reader := bufio.NewReader(os.Stdin)
+		// input, _ := reader.ReadString('\n') // TODO: fixme
+		input := "\n"
 		io.memory[address] = input[0]
 	case 0x03f8 + 5: // COM1+5: Line Status Register
 		io.memory[address] = 0x20

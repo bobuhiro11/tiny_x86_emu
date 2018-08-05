@@ -1884,6 +1884,7 @@ func (e *Emulator) decRegister32(rm uint8, value uint32) {
 	e.registers[rm] -= value
 }
 
+// virtual address -> segmentation -> linear address -> paging -> physical address
 func (e *Emulator) v2p(vaddress uint32) uint32 {
 	var paddress uint32
 	if (e.cr[0]&CR0PagingFlag != 0) && e.PageSizeExtensionEable {
