@@ -8,8 +8,8 @@ build:
         code: |
           sudo apt-get update
           sudo apt-get install -y nasm gcc git tar wget make bsdmainutils libglu1-mesa-dev libgles2-mesa-dev libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev libasound2-dev qemu gdb unzip python
-          wget https://dl.google.com/go/go1.10.linux-amd64.tar.gz
-          sudo tar -C /usr/local -zxf go1.10.linux-amd64.tar.gz
+          wget https://dl.google.com/go/go1.11.linux-amd64.tar.gz
+          sudo tar -C /usr/local -zxf go1.11.linux-amd64.tar.gz
     - script:
         name: install unicorn
         code: |
