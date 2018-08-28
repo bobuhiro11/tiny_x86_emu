@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/fatih/color"
+	// "github.com/fatih/color"
 	"io"
 )
 
@@ -2052,11 +2052,11 @@ func (e *Emulator) leave() {
 }
 
 func (e *Emulator) dump(index int) {
-	color.New(color.FgBlack).Printf("" +
+	fmt.Printf("" +
 		fmt.Sprintf("%10d", index) +
 		"---------------------" +
 		"-----------------------------\n")
-	color.New(color.FgCyan).Printf(""+
+	fmt.Printf(""+
 		"EAX=0x%08x "+
 		"ECX=0x%08x "+
 		"EDX=0x%08x "+
@@ -2076,9 +2076,9 @@ func (e *Emulator) dump(index int) {
 		e.registers[EBP],
 		e.eip, e.v2p(e.eip),
 	)
-	color.New(color.FgGreen).Printf("(opecode=%02x, %s)\n",
+	fmt.Printf("(opecode=%02x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
-	color.New(color.FgCyan).Printf(""+
+	fmt.Printf(""+
 		"CR0=0x%08x "+
 		"CR1=0x%08x "+
 		"CR2=0x%08x "+

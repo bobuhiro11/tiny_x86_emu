@@ -1,5 +1,6 @@
 # Binaries for programs and plugins
 tiny_x86_emu
+*.wasm
 *.regs
 *.exe
 *.dll

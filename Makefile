@@ -1,6 +1,7 @@
 rebuild: clean build
 build: xv6
 	go build
+	GOOS=js GOARCH=wasm go build -o tiny_x86_emu.wasm
 test: guest_bin xv6
 	ls qemu_xv6.log || wget https://www.dropbox.com/s/i2zwrr40zkvdjh0/qemu_xv6.log # download from cache
 	pkgs=$(go list ./... | grep -v /vendor/)

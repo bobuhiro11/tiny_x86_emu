@@ -29,10 +29,5 @@
   unused-packages = true
 
 [[constraint]]
-  name = "github.com/fatih/color"
-  version = "1.6.0"
-
-
-[[constraint]]
   name = "gopkg.in/yaml.v2"
   version = "2.2.1"

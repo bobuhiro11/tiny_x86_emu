@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"math/bits"
-	// "fmt"
-	"github.com/fatih/color"
+	// "github.com/fatih/color"
 )
 
 // Eflags is a set of flags
@@ -110,5 +110,6 @@ func (ef *Eflags) dump() {
 		s += "OF "
 	}
 	s += "\n"
-	color.New(color.FgCyan).Print(s)
+	// color.New(color.FgCyan).Print(s)
+	fmt.Print(s)
 }
