@@ -13,6 +13,7 @@ clean:
 xv6:
 	if [ ! -d xv6-public ]; then git clone --depth 1 https://github.com/mit-pdos/xv6-public.git; fi
 	make -C ./xv6-public
+	go-assets-builder ./xv6-public/xv6.img > assets.go
 guest_bin:
 	# binary from gcc
 	gcc -Wl,--entry=inc,--oformat=binary -nostdlib -fno-asynchronous-unwind-tables \

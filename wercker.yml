@@ -39,6 +39,7 @@ build:
           # glfw cannot be managed by dep
           go get -u -v github.com/go-gl/glfw/v3.2/glfw/...
           go get -u -v github.com/go-gl/gl/v2.1/gl/...
+          go get -u -v github.com/jessevdk/go-assets-builder
     - script:
         name: dep ensure
         code: |

@@ -4,7 +4,7 @@ import (
 	// "bufio"
 	"fmt"
 	"io"
-	"os"
+	// "os"
 )
 
 const (
@@ -12,12 +12,17 @@ const (
 	SectorSize = 512
 )
 
+type ReaderSeeker interface {
+	Seek(offset int64, whence int) (int64, error)
+	Read(p []byte) (n int, err error)
+}
+
 // IO has I/O port and emulate I/O device
 type IO struct {
 	memory [65536]uint8 // I/O port
 	reader *io.Reader
 	writer *io.Writer
-	hdds   [10]*os.File
+	hdds   [10]ReaderSeeker
 }
 
 // NewIO creates New IO

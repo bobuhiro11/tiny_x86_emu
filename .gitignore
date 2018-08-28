@@ -25,4 +25,5 @@ tags.lock
 # other
 *.swp
 *.log
+assets.go
 xv6-public
