@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"time"
 	// "github.com/fatih/color"
 	"io"
 )
@@ -218,7 +219,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	e.memory[0x040F] = uint8(EBDABase >> 12)
 
 	// setup EBDA (struct mp) at EBDABase
-	fmt.Printf("EBDA address=0x%X\n", ((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
+	printf("EBDA address=0x%X\n", ((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
 	for i, val := range getEBDA() {
 		e.memory[EBDABase+uint32(i)] = val
 	}
@@ -426,21 +427,21 @@ func (e *Emulator) execInst() error {
 	case 0xF3:
 		// rep prefix
 		ecx := e.getRegister32(ECX)
-		// fmt.Printf("repeat %d times. ", ecx)
+		// printf("repeat %d times. ", ecx)
 		if ecx > 1 {
 			e.eip++
-			// fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
+			// printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
 			e.execInst()
-			// fmt.Printf("The exec of %d loop finished.\n", ecx)
+			// printf("The exec of %d loop finished.\n", ecx)
 			e.decRegister32(ECX, 1)
 			e.eip -= 2
-			// fmt.Printf("Next eip=0x%x(0x%x) paddr of pdtentry=0x%x code=0x%x ecx=0x%x\n",
+			// printf("Next eip=0x%x(0x%x) paddr of pdtentry=0x%x code=0x%x ecx=0x%x\n",
 			// 	e.eip, e.v2p(e.eip),
 			// 	(e.cr[3]>>22)+4*(e.eip>>22),
 			// 	e.getCode8(0), e.getRegister32(ECX))
 		} else if ecx == 1 {
 			e.eip++
-			// fmt.Printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
+			// printf("eip=0x%x code=0x%x\n", e.eip, e.getCode8(0))
 			e.execInst()
 			e.decRegister32(ECX, 1)
 		} else {
@@ -488,7 +489,7 @@ func (e *Emulator) stosb() {
 func (e *Emulator) stosd() {
 	address := e.getRegister32(EDI)
 	value := e.getRegister32(EAX)
-	// fmt.Printf("stodsd address=0x%x(0x%x) value=0x%x\n", address, e.v2p(address), value)
+	// printf("stodsd address=0x%x(0x%x) value=0x%x\n", address, e.v2p(address), value)
 	e.setMemory32(address, value)
 	if e.eflags.isEnable(DirectionFlag) {
 		e.decRegister32(EDI, 4)
@@ -502,7 +503,7 @@ func (e *Emulator) insd() {
 	ioAddress := e.getRegister16(DX)
 	value := e.io.in32(ioAddress)
 	memAddress := e.getRegister32(EDI)
-	// fmt.Printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
+	// printf("(insd) input 0x%08x from io[0x%x] to memory[paddr=0x%x vaddr=0x%x]\n",
 	// 	value, ioAddress, memAddress, e.v2p(memAddress))
 	e.setMemory32(memAddress, value)
 	e.incRegister32(EDI, 4)
@@ -517,7 +518,8 @@ func (e *Emulator) cli() {
 func (e *Emulator) sti() {
 	e.eflags.set(InterruptFlag)
 	e.eip++
-	fmt.Printf("Enable Interruput Flag by sti inst.\n")
+	printf("Enable Interruput Flag by sti inst.\n")
+	time.Sleep(5 * time.Second)
 }
 
 func (e *Emulator) cld() {
@@ -587,7 +589,7 @@ func (e *Emulator) code0f() {
 			// LGDT
 			e.gdtrSize = e.getMemory16(address)
 			e.gdtrBase = e.v2p(e.getMemory32(address + 2))
-			fmt.Printf("lgdt: address=0x%x gdtSize=0x%x gdtBase=0x%x @emu\n",
+			printf("lgdt: address=0x%x gdtSize=0x%x gdtBase=0x%x @emu\n",
 				address, e.gdtrSize, e.gdtrBase)
 
 			e.dumpGDTEntry(e.gdtrBase)
@@ -600,10 +602,10 @@ func (e *Emulator) code0f() {
 			// LIDT
 			idtrSize := e.getMemory16(address)
 			idtrBase := e.v2p(e.getMemory32(address + 2))
-			fmt.Printf("lidt: address=0x%x idtSize=0x%x idtBase=0x%x @emu\n",
+			printf("lidt: address=0x%x idtSize=0x%x idtBase=0x%x @emu\n",
 				address, idtrSize, idtrBase)
 		} else {
-			fmt.Printf("Invalid Operation: 0x0f 0x01 but invalid opecode\n")
+			printf("Invalid Operation: 0x0f 0x01 but invalid opecode\n")
 		}
 	}
 	ltrRm16 := func() {
@@ -622,7 +624,7 @@ func (e *Emulator) code0f() {
 		e.taskState.ss0 = uint16(e.memory[e.tr.TSSBase+9])<<8 | uint16(e.memory[e.tr.TSSBase+8])
 		e.taskState.esp0 = uint32(e.memory[e.tr.TSSBase+7])<<24 | uint32(e.memory[e.tr.TSSBase+6])<<16 | uint32(e.memory[e.tr.TSSBase+5])<<8 | uint32(e.memory[e.tr.TSSBase+4])
 
-		fmt.Printf("ltrRm16: gdtEntryPhysAddr=0x%x tssBase=0x%x tssLimit=0x%x ss0=0x%x esp0=0x%x @emu\n",
+		printf("ltrRm16: gdtEntryPhysAddr=0x%x tssBase=0x%x tssLimit=0x%x ss0=0x%x esp0=0x%x @emu\n",
 			e.gdtrBase+uint32(e.tr.gdtOffset), e.tr.TSSBase, e.tr.TSSLimit, e.taskState.ss0, e.taskState.esp0)
 	}
 	movR32Cr := func() {
@@ -634,26 +636,26 @@ func (e *Emulator) code0f() {
 		m := e.parseModRM()
 		// e.cr[m.opecode] = e.getR32(m)
 		e.cr[m.opecode] = e.getRm32(m)
-		// fmt.Printf("%d %d\n", m.opecode, e.cr[m.opecode])
+		// printf("%d %d\n", m.opecode, e.cr[m.opecode])
 		// if m.opecode == 4 && e.cr[m.opecode]&CR4PageSizeExtension != 0 {
 		if m.opecode == 3 {
 			if e.cr[4]&CR4PageSizeExtension != 0 {
-				fmt.Printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
+				printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
 				e.PageSizeExtensionEable = true
 			} else {
-				fmt.Printf("CR4 page size sxtension Disabled (Page size is 4KB).\n")
+				printf("CR4 page size sxtension Disabled (Page size is 4KB).\n")
 				e.PageSizeExtensionEable = false
 			}
 			e.cr[4] &^= CR4PageSizeExtension
-			fmt.Printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode]>>12)
-			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
+			printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode]>>12)
+			printf("Page Directory Table[%d] = 0x%08x\n",
 				0, e.getMemory32((e.cr[m.opecode]>>22)+4*0))
-			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
+			printf("Page Directory Table[%d] = 0x%08x\n",
 				512, e.getMemory32((e.cr[m.opecode]>>22)+4*512))
-			fmt.Printf("Page Directory Table[%d] = 0x%08x\n",
+			printf("Page Directory Table[%d] = 0x%08x\n",
 				513, e.getMemory32((e.cr[m.opecode]>>22)+4*513))
 		} else if m.opecode == 0 && e.cr[m.opecode]&CR0PagingFlag != 0 {
-			fmt.Printf("CR0 paging is Enabled.\n")
+			printf("CR0 paging is Enabled.\n")
 		}
 	}
 	MovzxR32Rm8 := func() {
@@ -670,7 +672,7 @@ func (e *Emulator) code0f() {
 	}
 	MovzxR32Rm16 := func() {
 		m := e.parseModRM()
-		// fmt.Printf("m.disp32=0x%x\n", m.disp32)
+		// printf("m.disp32=0x%x\n", m.disp32)
 		// e.setRegister32(m.opecode, uint32(e.getMemory16(m.disp32)))
 		e.setRegister32(m.opecode, uint32(e.getRm16(m)))
 	}
@@ -692,7 +694,7 @@ func (e *Emulator) code0f() {
 	}
 	MovsxR32Rm16 := func() {
 		m := e.parseModRM()
-		// fmt.Printf("m.disp32=0x%x\n", m.disp32)
+		// printf("m.disp32=0x%x\n", m.disp32)
 		value := uint32(e.getMemory16(m.disp32))
 		if value&0x8000 != 0 {
 			value |= 0xFFFF0000
@@ -823,14 +825,14 @@ func (e *Emulator) movR32Imm32() {
 
 func (e *Emulator) movEaxMoffs32() {
 	value := e.getMemory32(e.getCode32(1))
-	// fmt.Printf("value=0x%x\n", value)
+	// printf("value=0x%x\n", value)
 	e.setRegister32(EAX, value)
 	e.eip += 5
 }
 
 func (e *Emulator) movMoffs32Eax() {
 	value := e.getRegister32(EAX)
-	// fmt.Printf("value=0x%x\n", value)
+	// printf("value=0x%x\n", value)
 	// e.setRegister32(EAX, value)
 	e.setMemory32(e.getCode32(1), value)
 	e.eip += 5
@@ -875,7 +877,7 @@ func (e *Emulator) code81() {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip += 4
-		// fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		// printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) + uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
@@ -883,7 +885,7 @@ func (e *Emulator) code81() {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip += 4
-		// fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		// printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) & uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
@@ -891,14 +893,14 @@ func (e *Emulator) code81() {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip += 4
-		// fmt.Printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
+		// printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) | uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
-		// fmt.Printf("eip=%x rm32 value=0x%x imm32 value=0x%x\n", e.eip, rm32, imm32)
+		// printf("eip=%x rm32 value=0x%x imm32 value=0x%x\n", e.eip, rm32, imm32)
 		e.eip += 4
 		result := uint64(rm32) - uint64(imm32)
 		e.eflags.updateBySub(rm32, imm32, result)
@@ -1093,13 +1095,13 @@ func (e *Emulator) codeFf() {
 		address := e.calcMemoryAddress32(m)
 		jmpAddress := e.getMemory32(address)
 		e.push32(e.eip + 6)
-		// fmt.Printf("address=0x%x jmpAddress=0x%x\n", address, jmpAddress)
+		// printf("address=0x%x jmpAddress=0x%x\n", address, jmpAddress)
 		e.eip = jmpAddress
 	}
 	jmpRm32 := func(e *Emulator, m ModRM) {
 		address := e.getRm32(m)
 		// address := e.calcMemoryAddress32(m)
-		// fmt.Printf("jmpRm32 address=0x%x address2=0x%x\n", address, e.getMemory32(address))
+		// printf("jmpRm32 address=0x%x address2=0x%x\n", address, e.getMemory32(address))
 		e.eip = address
 	}
 	e.eip++
@@ -1164,7 +1166,7 @@ func (e *Emulator) subRm32R32() {
 	m := e.parseModRM()
 	rm32 := e.getRm32(m)
 	r32 := e.getR32(m)
-	// fmt.Printf("rm32=0x%x r32=0x%x\n", rm32, r32)
+	// printf("rm32=0x%x r32=0x%x\n", rm32, r32)
 	e.setRm32(m, rm32-r32)
 }
 
@@ -1222,7 +1224,7 @@ func (e *Emulator) addR32Rm32() {
 func (e *Emulator) leaR32Rm32() {
 	e.eip++
 	m := e.parseModRM()
-	// fmt.Printf("leaR32Rm32 r=%d\n", m.opecode)
+	// printf("leaR32Rm32 r=%d\n", m.opecode)
 	e.setR32(m, e.calcMemoryAddress32(m))
 }
 
@@ -1238,7 +1240,7 @@ func (e *Emulator) movSregRm16() {
 	e.eip++
 	m := e.parseModRM()
 	rm16 := e.getRm16(m)
-	// fmt.Printf("m.opecode=%d\n", m.opecode)
+	// printf("m.opecode=%d\n", m.opecode)
 	e.setSreg16(m.opecode, rm16)
 }
 
@@ -1682,7 +1684,7 @@ func (e *Emulator) dumpGDTEntry(physAddr uint32) {
 	segmentLimit := ((entry >> 48) & 0xF << 16) | (entry & 0xFFFF)
 	isCodeSegment := (entry >> 44) & 1
 
-	fmt.Printf("GDTEntry[%d]={entryPhysAddr=0x%x segmentBaseAddr=0x%x segmentLimit=0x%x isCodeSegment=0x%x}\n",
+	printf("GDTEntry[%d]={entryPhysAddr=0x%x segmentBaseAddr=0x%x segmentLimit=0x%x isCodeSegment=0x%x}\n",
 		(physAddr-e.gdtrBase)/8, physAddr, segmentBaseAddr, segmentLimit, isCodeSegment)
 }
 
@@ -1700,7 +1702,7 @@ func (e *Emulator) getRm32(m ModRM) uint32 {
 		return e.getRegister32(m.rm)
 	}
 	address := e.calcMemoryAddress32(m)
-	// fmt.Printf("rm32 address=0x%x\n", address)
+	// printf("rm32 address=0x%x\n", address)
 	return e.getMemory32(address)
 }
 
@@ -1837,7 +1839,7 @@ func (e *Emulator) calcMemoryAddress32(m ModRM) uint32 {
 			result += uint32(disp8)
 		}
 
-		// fmt.Printf("calcMemoryAddress32 = 0x%x 0x%x 0x%x\n",
+		// printf("calcMemoryAddress32 = 0x%x 0x%x 0x%x\n",
 		// 	e.getRegister32(m.rm) , m.getSib(e) , uint32(disp8))
 		return result
 	} else if m.mod == 2 {
@@ -1905,7 +1907,7 @@ func (e *Emulator) v2p(vaddress uint32) uint32 {
 		}
 		paddress = pdtEntry&0xFFC00000 + vaddress&0x003FFFFF
 		if vaddress-paddress != 0 && vaddress-paddress != 0x80000000 {
-			fmt.Printf("pdtEntry=0x%x index=%d offset=0x%x vaddress=0x%x paddress=pdtEntry+offset=0x%x\n",
+			printf("pdtEntry=0x%x index=%d offset=0x%x vaddress=0x%x paddress=pdtEntry+offset=0x%x\n",
 				pdtEntry, vaddress>>22, vaddress&0x003FFFFF, vaddress, paddress)
 		}
 	} else if e.cr[0]&CR0PagingFlag != 0 {
@@ -1920,11 +1922,11 @@ func (e *Emulator) v2p(vaddress uint32) uint32 {
 		}
 		paddress = ptEntry&0xFFFFF000 + vaddress&0xFFF
 		if vaddress-paddress != 0 && vaddress-paddress != 0x80000000 {
-			// fmt.Printf("PDE base=0x%x PTE base=0x%x PDT index=%d PT index=%d vaddress=0x%x paddress=0x%x\n",
+			// printf("PDE base=0x%x PTE base=0x%x PDT index=%d PT index=%d vaddress=0x%x paddress=0x%x\n",
 			// 	e.cr[3]&0xFFFFF000, pdtEntry&0xFFFFF000, vaddress>>22, (vaddress>>12)&0x3FF, vaddress, paddress)
 		}
 	} else {
-		// fmt.Printf("PageSizeExtension is disabled.\n")
+		// printf("PageSizeExtension is disabled.\n")
 		paddress = vaddress
 	}
 	return paddress
@@ -1949,13 +1951,13 @@ func (e *Emulator) setMemory8(address uint32, value uint8) {
 	paddr := e.v2p(address)
 
 	if address == LocalAPICBase+SVR+1 && value&0x01 == 0x01 {
-		fmt.Printf("Local APIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
+		printf("Local APIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
 		return
 	} else if address == LocalAPICBase+TIMER+2 && value&0x02 == 0x02 {
-		fmt.Printf("Timer PERIODIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
+		printf("Timer PERIODIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
 		return
 	} else if paddr > PHYSTOP {
-		fmt.Printf("Invalid paddress: 0x%x\n", paddr)
+		printf("Invalid paddress: 0x%x\n", paddr)
 		return
 	}
 
@@ -1971,7 +1973,7 @@ func (e *Emulator) setMemory16(address uint32, value uint16) {
 func (e *Emulator) setMemory32(address, value uint32) {
 	if address == IOAPICBase && value == 0x00 {
 		ioapicData = 1 << 24
-		fmt.Printf("ioapic read is called. I have to return ioapicid\n")
+		printf("ioapic read is called. I have to return ioapicid\n")
 	}
 	for i := uint32(0); i < 4; i++ {
 		e.setMemory8(address+i, uint8(value>>uint32(i*8)&0xFF))
@@ -1980,18 +1982,18 @@ func (e *Emulator) setMemory32(address, value uint32) {
 
 // TODO: consider linear address transformation using DS
 func (e *Emulator) getMemory8(address uint32) uint8 {
-	// fmt.Printf("vaddr=%x paddr=%x\n", address, e.v2p(address))
+	// printf("vaddr=%x paddr=%x\n", address, e.v2p(address))
 	paddr := e.v2p(address)
 
 	if LocalAPICBase+ICRLO <= address && address <= LocalAPICBase+ICRLO+3 {
-		fmt.Printf("synched ICRLO = 0\n")
+		printf("synched ICRLO = 0\n")
 		// e.memory[paddr] = 0
 		return 0
 	} else if LocalAPICBase+ID+3 == address {
 		// e.memory[paddr] = 1
 		return 1
 	} else if paddr > PHYSTOP {
-		// fmt.Printf("Invalid paddress: 0x%x\n", paddr)
+		// printf("Invalid paddress: 0x%x\n", paddr)
 		return 0
 	}
 
@@ -2008,7 +2010,7 @@ func (e *Emulator) getMemory16(address uint32) uint16 {
 
 func (e *Emulator) getMemory32(address uint32) uint32 {
 	if address == IOAPICBase+4*4 {
-		fmt.Printf("Return 0x%x as ioapic data\n", ioapicData)
+		printf("Return 0x%x as ioapic data\n", ioapicData)
 		return ioapicData
 	}
 
@@ -2052,11 +2054,11 @@ func (e *Emulator) leave() {
 }
 
 func (e *Emulator) dump(index int) {
-	fmt.Printf("" +
+	printf("" +
 		fmt.Sprintf("%10d", index) +
 		"---------------------" +
 		"-----------------------------\n")
-	fmt.Printf(""+
+	printf(""+
 		"EAX=0x%08x "+
 		"ECX=0x%08x "+
 		"EDX=0x%08x "+
@@ -2076,9 +2078,9 @@ func (e *Emulator) dump(index int) {
 		e.registers[EBP],
 		e.eip, e.v2p(e.eip),
 	)
-	fmt.Printf("(opecode=%02x, %s)\n",
+	printf("(opecode=%02x, %s)\n",
 		e.getCode8(0), e.disasm[uint64(e.eip)])
-	fmt.Printf(""+
+	printf(""+
 		"CR0=0x%08x "+
 		"CR1=0x%08x "+
 		"CR2=0x%08x "+
@@ -2180,7 +2182,7 @@ func (m *ModRM) getSib(e *Emulator) uint32 { // Indicate [--][--]
 			result += e.getRegister32(index) * uint32(1<<scale)
 		}
 
-		// fmt.Printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib, base, index, scale, result)
+		// printf("sib=0x%x base=0x%x index=0x%x scale=0x%x value=0x%x\n", m.sib, base, index, scale, result)
 		return result
 	}
 	return uint32(0)
@@ -2205,7 +2207,7 @@ func (m *ModRM) setDisp16(disp16 int16) {
 // load ModR/M & increment eip
 func (e *Emulator) parseModRM() ModRM {
 	code := e.getCode8(0)
-	// fmt.Printf("modrm=0x%x\n", code)
+	// printf("modrm=0x%x\n", code)
 
 	// 76  543                210
 	// mod regIndex(opecode) r/m
@@ -2216,7 +2218,7 @@ func (e *Emulator) parseModRM() ModRM {
 	}
 
 	e.eip++
-	// fmt.Printf("get mod=0x%x opecode=0x%x rm=0x%x\n", m.mod, m.opecode, m.rm)
+	// printf("get mod=0x%x opecode=0x%x rm=0x%x\n", m.mod, m.opecode, m.rm)
 
 	if e.cr[0]&1 == 0 {
 		// 16 bit mode
@@ -2226,7 +2228,7 @@ func (e *Emulator) parseModRM() ModRM {
 		} else if m.rm == 6 || m.mod == 2 {
 			m.setDisp16(e.getSignCode16(0))
 			e.eip += 2
-			// fmt.Printf("set disp16 eip=0x%x\n", e.eip)
+			// printf("set disp16 eip=0x%x\n", e.eip)
 		}
 	} else {
 		// 32 bit mode
@@ -2240,14 +2242,14 @@ func (e *Emulator) parseModRM() ModRM {
 			// 	m.disp32Sib = uint32(e.getCode8(0))
 			// 	e.eip++
 			// }
-			// fmt.Printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
+			// printf("get sib=0x%x disp32Sib=0x%x\n", m.sib, m.disp32Sib)
 		}
 
 		if (m.mod == 0 && m.rm == 5) || m.mod == 2 || (m.mod == 0 && m.rm == 4 && m.sib&0x7 == 0x5) || (m.mod == 2 && m.rm == 4 && m.sib&0x7 == 0x5) {
 			// The last two condition are as below:
 			// [scaled index] + disp32
 			// [scaled index] + disp32 + [EBP]
-			// fmt.Printf("get disp32 from eip=0x%x\n", e.eip)
+			// printf("get disp32 from eip=0x%x\n", e.eip)
 			m.disp32 = e.getCode32(0)
 			e.eip += 4
 		} else if m.mod == 1 || (m.mod == 1 && m.rm == 4 && m.sib&0x7 == 0x5) {

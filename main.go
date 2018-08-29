@@ -30,6 +30,10 @@ var (
 	vram = image.NewRGBA(image.Rect(0, 0, width, height))
 )
 
+func printf(format string, a ...interface{}) {
+	fmt.Printf(format, a...)
+}
+
 // func update(screen *ebiten.Image) error {
 // 	for i := 0; i < width*height; i++ {
 // 		vram.Pix[4*i] = uint8(rand.Int() & 0xFF)
@@ -53,7 +57,7 @@ func main() {
 
 	// load binary
 	if *filename == "" {
-		fmt.Fprintln(os.Stderr, "Please set filename")
+		printf("Please set filename\n")
 		os.Exit(1)
 	}
 	// disasm binary
@@ -94,9 +98,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	// fmt.Printf("enable GUI = %#v\n", *enableGUI)
-	fmt.Printf("len(bytes) = %d\n", len(bytes))
-	// fmt.Printf("bytes =\n%s", hex.Dump(bytes))
+	// printf("enable GUI = %#v\n", *enableGUI)
+	printf("len(bytes) = %d\n", len(bytes))
+	// printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator
 	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, *silent, os.Stdin, os.Stdout, disasm)
@@ -119,7 +123,7 @@ func main() {
 		}
 		err := e.execInst()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			printf(err.Error())
 			os.Exit(1)
 		}
 
@@ -131,7 +135,7 @@ func main() {
 	if !*silent {
 		e.dump(i)
 	}
-	fmt.Println("End of program")
+	printf("End of program\n")
 	// chFinished <- true
 	// }(chFinished)
 

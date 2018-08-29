@@ -6,17 +6,23 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"runtime"
+	"time"
+	// "runtime"
 	"syscall/js"
 )
 
+func printf(format string, a ...interface{}) {
+	// fmt.Printf(format, a)
+	s := fmt.Sprintf(format, a...)
+	// fmt.Println(s)
+	t := js.Global().Get("document").Call("getElementById", "terminal")
+	t.Call("insertAdjacentHTML", "beforeend", s)
+	time.Sleep(10 * time.Millisecond)
+}
+
 func main() {
-	fmt.Printf("Hello, wasm!\n")
-	for i := 0; i < 10; i++ {
-		t := js.Global().Get("document").Call("getElementById", "terminal")
-		t.Set("innerHTML", t.Get("innerHTML").String()+"hello, wasm2\n")
-	}
-	runtime.LockOSThread()
+	printf("hello, world!!!!")
+	// runtime.LockOSThread()
 	f, err := Assets.Open("/xv6-public/xv6.img")
 	if err != nil {
 		panic(err)
@@ -25,7 +31,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(len(bytes))
 
 	// setup emulator
 	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, true, os.Stdin, os.Stdout, map[uint64]string{})
@@ -45,7 +50,7 @@ func main() {
 		}
 		err := e.execInst()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			printf(err.Error())
 			os.Exit(1)
 		}
 
@@ -55,5 +60,5 @@ func main() {
 		i++
 	}
 	e.dump(i)
-	fmt.Println("End of program")
+	printf("End of program\n")
 }

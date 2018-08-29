@@ -9,6 +9,7 @@ test: guest_bin xv6
 	golint ${pkgs}
 	go test ${pkgs} -v --cover -timeout 5h
 clean:
+	rm tiny_x86_emu.wasm || true
 	go clean
 xv6:
 	if [ ! -d xv6-public ]; then git clone --depth 1 https://github.com/mit-pdos/xv6-public.git; fi
