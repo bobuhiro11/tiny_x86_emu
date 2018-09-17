@@ -2,7 +2,7 @@ package main
 
 import (
 	// "bufio"
-	"fmt"
+	// "fmt"
 	"io"
 	// "os"
 )
@@ -111,7 +111,8 @@ func (io *IO) out8(address uint16, value uint8) {
 	case 0x0064: // Keyboard Input Buffer
 		return
 	case 0x03f8: // COM1+0: Transmitter Holding Register
-		fmt.Fprint(*io.writer, string(io.memory[address]))
+		// fmt.Fprint(*io.writer, string(io.memory[address]))
+		printf("%s", string(io.memory[address]))
 	default:
 		return
 	}

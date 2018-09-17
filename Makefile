@@ -1,7 +1,7 @@
 rebuild: clean build
 build: xv6
 	go build
-	GOOS=js GOARCH=wasm go build -o tiny_x86_emu.wasm
+	GOOS=js GOARCH=wasm go build -o ./wasm/tiny_x86_emu.wasm
 test: guest_bin xv6
 	ls qemu_xv6.log || wget https://www.dropbox.com/s/i2zwrr40zkvdjh0/qemu_xv6.log # download from cache
 	pkgs=$(go list ./... | grep -v /vendor/)
@@ -9,7 +9,7 @@ test: guest_bin xv6
 	golint ${pkgs}
 	go test ${pkgs} -v --cover -timeout 5h
 clean:
-	rm tiny_x86_emu.wasm || true
+	rm ./wasm/tiny_x86_emu.wasm || true
 	go clean
 xv6:
 	if [ ! -d xv6-public ]; then git clone --depth 1 https://github.com/mit-pdos/xv6-public.git; fi

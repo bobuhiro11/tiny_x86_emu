@@ -21,6 +21,7 @@ disasm32.txt
 .glide/
 vendor/
 tags.lock
+tags
 
 # other
 *.swp

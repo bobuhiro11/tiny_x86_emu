@@ -12,12 +12,18 @@ import (
 )
 
 func printf(format string, a ...interface{}) {
-	// fmt.Printf(format, a)
 	s := fmt.Sprintf(format, a...)
-	// fmt.Println(s)
 	t := js.Global().Get("document").Call("getElementById", "terminal")
 	t.Call("insertAdjacentHTML", "beforeend", s)
+	t.Set("scrollTop", t.Get("scrollHeight"))
 	time.Sleep(10 * time.Millisecond)
+}
+
+type WasmWriter struct{}
+
+func (w WasmWriter) Write(p []byte) (n int, err error) {
+	printf("[foo]%v", p)
+	return len(p), nil
 }
 
 func main() {
@@ -33,7 +39,8 @@ func main() {
 	}
 
 	// setup emulator
-	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, true, os.Stdin, os.Stdout, map[uint64]string{})
+	writer := WasmWriter{}
+	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, true, os.Stdin, writer, map[uint64]string{})
 	for i := 0; i < len(bytes); i++ {
 		e.memory[uint32(i+0x7c00)] = bytes[i]
 	}
@@ -54,7 +61,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		if e.eip == 0 || e.eip == 0x7c00 {
+		// exit in scheduler()
+		if e.eip == 0 || e.eip == 0x7c00 || e.eip == 0x80103bf0 {
 			break
 		}
 		i++
