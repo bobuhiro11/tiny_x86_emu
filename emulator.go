@@ -1957,7 +1957,7 @@ func (e *Emulator) setMemory8(address uint32, value uint8) {
 		printf("Timer PERIODIC Enabled vaddr=0x%x paddr=0x%x\n", address, paddr)
 		return
 	} else if paddr > PHYSTOP {
-		printf("Invalid paddress: 0x%x\n", paddr)
+		// printf("Invalid paddress: 0x%x\n", paddr)
 		return
 	}
 

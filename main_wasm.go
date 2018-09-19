@@ -16,7 +16,7 @@ func printf(format string, a ...interface{}) {
 	t := js.Global().Get("document").Call("getElementById", "terminal")
 	t.Call("insertAdjacentHTML", "beforeend", s)
 	t.Set("scrollTop", t.Get("scrollHeight"))
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 }
 
 type WasmWriter struct{}

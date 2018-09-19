@@ -80,32 +80,34 @@ func (io *IO) out8(address uint16, value uint8) {
 	io.memory[address] = value
 	switch address {
 	case 0x01f2: // Secter Count
-		printf("Secter Count=%d\n", io.memory[address])
+		// printf("Secter Count=%d\n", io.memory[address])
 		return
 	case 0x01f3: // Secter Number
 		io.hdds[0].Seek(0, 0) // Read a entire sector (TODO: check)
-		offset, _ := io.hdds[0].Seek(int64(value)*SectorSize, 1)
-		printf("Secter Number=%d offset=%d\n", io.memory[address], offset)
+		io.hdds[0].Seek(int64(value)*SectorSize, 1)
+		// printf("Secter Number=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f4: // Cylinder low
-		offset, _ := io.hdds[0].Seek(int64(uint32(value)<<8)*SectorSize, 1)
-		printf("Sylinder Low=%d offset=%d\n", io.memory[address], offset)
+		io.hdds[0].Seek(int64(uint32(value)<<8)*SectorSize, 1)
+		// printf("Sylinder Low=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f5: // Cylinder High
-		offset, _ := io.hdds[0].Seek(int64(uint32(value)<<16)*SectorSize, 1)
-		printf("Sylinder High=%d offset=%d\n", io.memory[address], offset)
+		io.hdds[0].Seek(int64(uint32(value)<<16)*SectorSize, 1)
+		// printf("Sylinder High=%d offset=%d\n", io.memory[address], offset)
 		return
 	case 0x01f6: // Drive/Head
-		offset, _ := io.hdds[0].Seek(int64((uint32(value)&0x1F)<<24)*SectorSize, 1)
-		printf("Drive Number=%d offset=%d\n", (io.memory[address]&0x8)>>4, offset)
+		io.hdds[0].Seek(int64((uint32(value)&0x1F)<<24)*SectorSize, 1)
+		// printf("Drive Number=%d offset=%d\n", (io.memory[address]&0x8)>>4, offset)
 		return
 	case 0x01f7: // Command Register
-		printf("Command Register=%d\n", io.memory[address])
+		// printf("Command Register=%d\n", io.memory[address])
 		switch io.memory[address] {
 		case 0x20:
-			printf("Read sectors with Retry command is sent.\n")
+			// printf("Read sectors with Retry command is sent.\n")
+			return
+		default:
+			return
 		}
-		return
 	case 0x0060: // Keyboard Input Register
 		return
 	case 0x0064: // Keyboard Input Buffer

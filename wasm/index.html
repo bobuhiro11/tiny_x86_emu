@@ -8,7 +8,7 @@ license that can be found in the LICENSE file.
 
 <head>
 	<meta charset="utf-8">
-	<title>tiny x86 emu</title>
+	<title>WIP: tiny x86 emu</title>
 </head>
 
 <style>
@@ -20,6 +20,7 @@ license that can be found in the LICENSE file.
     height: 600px;
     overflow: auto;
     white-space: pre-wrap;
+    word-wrap: break-word;
 }
 </style>
 
@@ -48,7 +49,7 @@ license that can be found in the LICENSE file.
 			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
 		}
 	</script>
-    <h1>tiny x86 emu</h1>
+    <h1>WIP: tiny x86 emu</h1>
     <p>This is a experimental x86 emulator.</p>
 	<button onClick="run();" id="runButton" disabled>Run</button>
     <pre id="terminal"></pre>
