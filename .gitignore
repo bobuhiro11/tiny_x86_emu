@@ -27,4 +27,3 @@ tags
 *.swp
 *.log
 assets.go
-xv6-public
