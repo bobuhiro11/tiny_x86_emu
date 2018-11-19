@@ -68,7 +68,7 @@ func ExecEmu() {
 	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, true, reader, writer, map[uint64]string{})
 
 	// load file
-	bin, err := LoadFile("./xv6-public/xv6.img")
+	bin, err := LoadFile("./xv6_testing.img")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -76,7 +76,7 @@ func ExecEmu() {
 	for i := 0; i < len(bin); i++ {
 		e.memory[uint32(i+0x7c00)] = bin[i]
 	}
-	e.io.hdds[0], _ = os.Open("./xv6-public/xv6.img")
+	e.io.hdds[0], _ = os.Open("./xv6_testing.img")
 
 	// main loop
 	var res []RegisterSet
@@ -171,7 +171,7 @@ func ExecQemu() {
 	gdbScriptPath := MakeGdbScript()
 
 	qemuCmd := exec.Command("qemu-system-i386",
-		"-drive", "file=./xv6-public/fs.img,index=1,media=disk,format=raw", "-drive", "file=./xv6-public/xv6.img,index=0,media=disk,format=raw", "-smp", "2", "-m", "512",
+		"-drive", "file=./xv6-public/fs.img,index=1,media=disk,format=raw", "-drive", "file=./xv6_testing.img,index=0,media=disk,format=raw", "-smp", "2", "-m", "512",
 		"-S", "-gdb", "tcp::1234", "-nographic")
 	qemuCmd.Start()
 	defer func() {
