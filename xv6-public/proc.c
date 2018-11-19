@@ -46,10 +46,13 @@ mycpu(void)
   // APIC IDs are not guaranteed to be contiguous. Maybe we should have
   // a reverse map, or reserve a register to store &cpus[i].
   for (i = 0; i < ncpu; ++i) {
+    // cprintf("i=%d\n",i);
+    // cprintf("ncpu=%d cpu[0].apicid=%d apicid=%d\n",ncpu,cpus[0].apicid , apicid );
     if (cpus[i].apicid == apicid)
       return &cpus[i];
   }
-  panic("unknown apicid\n");
+  // cprintf("2: ncpu=%d cpu[0].apicid=%d apicid=%d\n",ncpu,cpus[0].apicid , apicid );
+  panic("unknown apicid");
 }
 
 // Disable interrupts so that we are not rescheduled
@@ -341,10 +344,13 @@ scheduler(void)
       // before jumping back to us.
       c->proc = p;
       switchuvm(p);
+      cprintf("switchuvm finished.\n");
       p->state = RUNNING;
 
+      cprintf("swtch new EIP=0x%p\n", p->context->eip);
       swtch(&(c->scheduler), p->context);
       switchkvm();
+      cprintf("switchkvm finished.\n");
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -396,6 +402,7 @@ yield(void)
 void
 forkret(void)
 {
+  cprintf("forkret started\n");
   static int first = 1;
   // Still holding ptable.lock from scheduler.
   release(&ptable.lock);
@@ -408,6 +415,7 @@ forkret(void)
     iinit(ROOTDEV);
     initlog(ROOTDEV);
   }
+  cprintf("forkret ended.\n");
 
   // Return to "caller", actually trapret (see allocproc).
 }

@@ -26,6 +26,7 @@ seginit(void)
   c->gdt[SEG_KDATA] = SEG(STA_W, 0, 0xffffffff, 0);
   c->gdt[SEG_UCODE] = SEG(STA_X|STA_R, 0, 0xffffffff, DPL_USER);
   c->gdt[SEG_UDATA] = SEG(STA_W, 0, 0xffffffff, DPL_USER);
+  cprintf("seginit: gdt address=0x%p size=0x%p @kernel\n", c->gdt, sizeof(c->gdt));
   lgdt(c->gdt, sizeof(c->gdt));
 }
 
@@ -51,6 +52,8 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
     // entries, if necessary.
     *pde = V2P(pgtab) | PTE_P | PTE_W | PTE_U;
   }
+  // cprintf("address of PTE in PTD = 0x%p, va=0x%p\n", &pgtab[PTX(va)], va);
+
   return &pgtab[PTX(va)];
 }
 
@@ -126,12 +129,16 @@ setupkvm(void)
   memset(pgdir, 0, PGSIZE);
   if (P2V(PHYSTOP) > (void*)DEVSPACE)
     panic("PHYSTOP too high");
-  for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
+  for(k = kmap; k < &kmap[NELEM(kmap)]; k++) {
     if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
                 (uint)k->phys_start, k->perm) < 0) {
       freevm(pgdir);
       return 0;
     }
+    cprintf("virt=0x%p phys_start=0x%p phys_end=0x%p perm=0x%p\n",
+            k->virt, k->phys_start, k->phys_end, k->perm);
+  }
+  cprintf("address of pgdir is 0x%p\n", pgdir);
   return pgdir;
 }
 
@@ -164,6 +171,8 @@ switchuvm(struct proc *p)
     panic("switchuvm: no pgdir");
 
   pushcli();
+  struct cpu *c = mycpu();
+  cprintf("switchuvm: base address of ts=0x%p, &(ts->ss0)=0x%p gdt base=0x%p @kernel\n", &(c->ts), &(c->ts.ss0),c->gdt); // base address of ts=0x80112788
   mycpu()->gdt[SEG_TSS] = SEG16(STS_T32A, &mycpu()->ts,
                                 sizeof(mycpu()->ts)-1, 0);
   mycpu()->gdt[SEG_TSS].s = 0;
@@ -172,6 +181,7 @@ switchuvm(struct proc *p)
   // setting IOPL=0 in eflags *and* iomb beyond the tss segment limit
   // forbids I/O instructions (e.g., inb and outb) from user space
   mycpu()->ts.iomb = (ushort) 0xFFFF;
+
   ltr(SEG_TSS << 3);
   lcr3(V2P(p->pgdir));  // switch to process's address space
   popcli();
@@ -332,10 +342,8 @@ copyuvm(pde_t *pgdir, uint sz)
     if((mem = kalloc()) == 0)
       goto bad;
     memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
-      kfree(mem);
+    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0)
       goto bad;
-    }
   }
   return d;
 

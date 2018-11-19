@@ -175,7 +175,8 @@ consputc(int c)
     uartputc('\b'); uartputc(' '); uartputc('\b');
   } else
     uartputc(c);
-  cgaputc(c);
+  // NOTE(nmi): disable for debugging
+  // cgaputc(c);
 }
 
 #define INPUT_BUF 128
@@ -290,10 +291,15 @@ consoleinit(void)
 {
   initlock(&cons.lock, "console");
 
+  cprintf("spinlock for console initialized\n"); 
   devsw[CONSOLE].write = consolewrite;
   devsw[CONSOLE].read = consoleread;
-  cons.locking = 1;
+  cprintf("devsw initialized\n"); 
+  // cons.locking = 1; // disable locking becasuse `cprintf` needs cons.locking
+  cprintf("cons.locked.\n"); 
 
+  cprintf("ioapicenable setup started.\n"); 
   ioapicenable(IRQ_KBD, 0);
+  cprintf("ioapicenable setup finished.\n"); 
 }
 

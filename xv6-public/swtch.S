@@ -11,7 +11,7 @@ swtch:
   movl 4(%esp), %eax
   movl 8(%esp), %edx
 
-  # Save old callee-saved registers
+  # Save old callee-save registers
   pushl %ebp
   pushl %ebx
   pushl %esi
@@ -21,7 +21,7 @@ swtch:
   movl %esp, (%eax)
   movl %edx, %esp
 
-  # Load new callee-saved registers
+  # Load new callee-save registers
   popl %edi
   popl %esi
   popl %ebx

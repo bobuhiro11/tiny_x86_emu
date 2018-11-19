@@ -41,7 +41,8 @@
 #define TCCR    (0x0390/4)   // Timer Current Count
 #define TDCR    (0x03E0/4)   // Timer Divide Configuration
 
-volatile uint *lapic;  // Initialized in mp.c
+// nmiki, lapic = 0xFEC80000
+volatile uint *lapic;  // Initialized in mp.cp
 
 //PAGEBREAK!
 static void
@@ -57,7 +58,8 @@ lapicinit(void)
   if(!lapic)
     return;
 
-  // Enable local APIC; set spurious interrupt vector.
+  cprintf("start lapicinit\n");
+  // Enable local APIC; set fake (spurious) interrupt vector.
   lapicw(SVR, ENABLE | (T_IRQ0 + IRQ_SPURIOUS));
 
   // The timer repeatedly counts down at bus frequency
@@ -90,8 +92,9 @@ lapicinit(void)
   // Send an Init Level De-Assert to synchronise arbitration ID's.
   lapicw(ICRHI, 0);
   lapicw(ICRLO, BCAST | INIT | LEVEL);
-  while(lapic[ICRLO] & DELIVS)
-    ;
+  while(lapic[ICRLO] & DELIVS) {
+    cprintf("Waiting for sync lapic\n");
+  }
 
   // Enable interrupts on the APIC (but not on the processor).
   lapicw(TPR, 0);
@@ -102,6 +105,7 @@ lapicid(void)
 {
   if (!lapic)
     return 0;
+  // cprintf("lapic[ID]=%d lapic=0x%p\n",lapic[ID],lapic);
   return lapic[ID] >> 24;
 }
 
@@ -171,8 +175,7 @@ lapicstartap(uchar apicid, uint addr)
 #define MONTH   0x08
 #define YEAR    0x09
 
-static uint
-cmos_read(uint reg)
+static uint cmos_read(uint reg)
 {
   outb(CMOS_PORT,  reg);
   microdelay(200);
@@ -180,8 +183,7 @@ cmos_read(uint reg)
   return inb(CMOS_RETURN);
 }
 
-static void
-fill_rtcdate(struct rtcdate *r)
+static void fill_rtcdate(struct rtcdate *r)
 {
   r->second = cmos_read(SECS);
   r->minute = cmos_read(MINS);
@@ -192,8 +194,7 @@ fill_rtcdate(struct rtcdate *r)
 }
 
 // qemu seems to use 24-hour GWT and the values are BCD encoded
-void
-cmostime(struct rtcdate *r)
+void cmostime(struct rtcdate *r)
 {
   struct rtcdate t1, t2;
   int sb, bcd;

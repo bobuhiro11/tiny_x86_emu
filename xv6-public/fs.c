@@ -172,6 +172,7 @@ struct {
 void
 iinit(int dev)
 {
+  cprintf("iinit started\n");
   int i = 0;
   
   initlock(&icache.lock, "icache");

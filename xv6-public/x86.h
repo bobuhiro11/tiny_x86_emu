@@ -51,10 +51,12 @@ stosb(void *addr, int data, int cnt)
 static inline void
 stosl(void *addr, int data, int cnt)
 {
+  // cprintf("stosl start. addr=0x%p data=%d cnt=%d\n",addr,data,cnt);
   asm volatile("cld; rep stosl" :
                "=D" (addr), "=c" (cnt) :
                "0" (addr), "1" (cnt), "a" (data) :
                "memory", "cc");
+  // cprintf("stosl end.\n");
 }
 
 struct segdesc;
@@ -141,6 +143,7 @@ rcr2(void)
 static inline void
 lcr3(uint val)
 {
+  cprintf("mov 0x%p -> cr3\n", val);
   asm volatile("movl %0,%%cr3" : : "r" (val));
 }
 

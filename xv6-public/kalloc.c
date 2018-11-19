@@ -39,7 +39,10 @@ kinit1(void *vstart, void *vend)
 void
 kinit2(void *vstart, void *vend)
 {
+  // cprintf("kmem.use_lock=%d at kinit2\n",kmem.use_lock);
+  // cprintf("vstart=0x%p vend=0x%p at kinit2\n", vstart ,vend);
   freerange(vstart, vend);
+  // cprintf("freerange finished at kinit2\n");
   kmem.use_lock = 1;
 }
 
@@ -48,8 +51,13 @@ freerange(void *vstart, void *vend)
 {
   char *p;
   p = (char*)PGROUNDUP((uint)vstart);
-  for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)vend; p += PGSIZE) {
+     if ((((int)p) & 0xFFFFF) == 0) {
+         // cprintf("kfree(0x%p) called.\n",p);
+         cprintf(".");
+    }
     kfree(p);
+  }
 }
 //PAGEBREAK: 21
 // Free the page of physical memory pointed at by v,
@@ -67,13 +75,15 @@ kfree(char *v)
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
 
-  if(kmem.use_lock)
-    acquire(&kmem.lock);
+  // if(kmem.use_lock) {
+  //   acquire(&kmem.lock);
+  // }
+  // cprintf("kmem.use_lock=%d at kfree\n",kmem.use_lock);
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
-  if(kmem.use_lock)
-    release(&kmem.lock);
+  // if(kmem.use_lock)
+  //   release(&kmem.lock);
 }
 
 // Allocate one 4096-byte page of physical memory.

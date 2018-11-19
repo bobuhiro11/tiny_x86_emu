@@ -18,23 +18,39 @@ int
 main(void)
 {
   kinit1(end, P2V(4*1024*1024)); // phys page allocator
+  cprintf("kinit1(0x%p,0x%p) finished\n", end, P2V(4*1024*1024));
+  cprintf("kvmalloc() started.\n");
   kvmalloc();      // kernel page table
+  cprintf("kvmalloc() finished.\n");
   mpinit();        // detect other processors
+  cprintf("mpinit() finished\n");
   lapicinit();     // interrupt controller
+  cprintf("lapicinit() finished\n");
   seginit();       // segment descriptors
+  cprintf("seginit() finished\n");
   picinit();       // disable pic
+  cprintf("picinit() finished\n");
   ioapicinit();    // another interrupt controller
+  cprintf("ioapic() finished\n");
   consoleinit();   // console hardware
+  cprintf("consoleinit() finished\n");
   uartinit();      // serial port
+  cprintf("uartinit() finished\n");
   pinit();         // process table
   tvinit();        // trap vectors
   binit();         // buffer cache
   fileinit();      // file table
   ideinit();       // disk 
+  cprintf("ideoinit() finished\n");
   startothers();   // start other processors
+  cprintf("starttoothers() finished\n");
+  cprintf("kinit2(0x%p,0x%p) start\n",P2V(4*1024*1024), P2V(PHYSTOP));
   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()
+  cprintf("kinit2(0x%p,0x%p) finished\n",P2V(4*1024*1024), P2V(PHYSTOP));
   userinit();      // first user process
+  cprintf("userinit finished\n");
   mpmain();        // finish this processor's setup
+  cprintf("mpmain finished\n");
 }
 
 // Other CPUs jump here from entryother.S.
@@ -83,7 +99,7 @@ startothers(void)
     // is running in low  memory, so we use entrypgdir for the APs too.
     stack = kalloc();
     *(void**)(code-4) = stack + KSTACKSIZE;
-    *(void(**)(void))(code-8) = mpenter;
+    *(void**)(code-8) = mpenter;
     *(int**)(code-12) = (void *) V2P(entrypgdir);
 
     lapicstartap(c->apicid, V2P(code));
