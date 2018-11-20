@@ -5,6 +5,7 @@ package main
 // PIC(8259)は、IOAPIC（またはcpu0のlocal APIC）に接続されている
 // xv6では、レガシーデバイス（PS/2 keyboard, IDE, COM0）のために、PIC->IOAPICの順で割り込み設定をする
 
+// LocalAPIC is ..
 // in CPU
 // - Select Interrupt Vector Number
 // - End of Interrupt
@@ -16,9 +17,11 @@ type LocalAPIC struct {
 	IMR uint8 // Interrupt Mask Register, the bit is 0 only when the IRQ is enabled.
 }
 
+// IOAPIC is ...
 // at ICH (South Bridge)
 type IOAPIC struct {
 }
 
+// PIC is ...
 type PIC struct {
 }

@@ -12,6 +12,7 @@ const (
 	SectorSize = 512
 )
 
+// ReaderSeeker interface contains Seek and Read function
 type ReaderSeeker interface {
 	Seek(offset int64, whence int) (int64, error)
 	Read(p []byte) (n int, err error)

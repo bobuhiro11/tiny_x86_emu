@@ -6,8 +6,7 @@ test: guest_bin xv6
 	ls qemu_xv6.log || wget https://www.dropbox.com/s/i2zwrr40zkvdjh0/qemu_xv6.log # download from cache
 	pkgs=$(go list ./... | grep -v /vendor/)
 	go vet ${pkgs}
-	golint ${pkgs}
-	go test ${pkgs} -v --cover -timeout 5h
+	golint ${pkgs} && go test ${pkgs} -v --cover -timeout 5h
 clean:
 	rm ./wasm/tiny_x86_emu.wasm || true
 	go clean

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	// "errors"
 	"fmt"
 	"time"
 	// "github.com/fatih/color"
@@ -62,20 +62,34 @@ const (
 )
 
 const (
-	EBDABase          = uint32(0x600) // address of struct mp
-	MpConfigTableBase = uint32(0x700) // TODO: address of struct mpconf,need check
+	// EBDABase is an address of struct mp
+	EBDABase          = uint32(0x600)
+
+	// MpConfigTableBase is and address of struct mpconf
+	// TODO: I need check
+	MpConfigTableBase = uint32(0x700)
+
+	// LocalAPICBase is ...
 	LocalAPICBase     = uint32(0xFEC80000)
+
+	// IOAPICBase is ...
 	IOAPICBase        = uint32(0xFEC00000)
+
+	// PHYSTOP is ...
 	PHYSTOP           = uint32(0xE000000)
+
+	// DEVSPACE is ...
 	DEVSPACE          = uint32(0xFE000000)
 )
 
+// TaskRegister contains offset of GDT, TSS base and TSS Limit
 type TaskRegister struct {
 	gdtOffset uint16 // offset in GDT
 	TSSBase   uint32 // Base Address of Task State Segment
 	TSSLimit  uint32 // Size of Task Steate Segment
 }
 
+// TaskState is ...
 type TaskState struct {
 	esp0 uint32
 	ss0  uint16
@@ -465,7 +479,7 @@ func (e *Emulator) execInst() error {
 	case 0xFF:
 		e.codeFf()
 	default:
-		return errors.New(fmt.Sprintf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst().", e.eip, e.v2p(e.eip), e.getCode8(0)))
+		return fmt.Errorf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst()", e.eip, e.v2p(e.eip), e.getCode8(0))
 	}
 	return nil
 }
@@ -842,7 +856,7 @@ func (e *Emulator) movRm8Imm8() {
 	e.eip++
 	m := e.parseModRM()
 	value := e.getCode8(0)
-	e.eip += 1
+	e.eip ++
 	e.setRm8(m, value)
 }
 
