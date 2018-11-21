@@ -1,5 +1,10 @@
 // Routines to let C code use special x86 instructions.
 
+#define print_pos(s) \
+do { \
+    cprintf("[%s L.%d] %s called\n",__FILE__,__LINE__,s); \
+} while(0);
+
 static inline uchar
 inb(ushort port)
 {

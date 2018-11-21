@@ -84,6 +84,8 @@ startothers(void)
   struct cpu *c;
   char *stack;
 
+  print_pos("starttoothers");
+
   // Write entry code to unused memory at 0x7000.
   // The linker has placed the image of entryother.S in
   // _binary_entryother_start.

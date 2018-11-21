@@ -479,7 +479,7 @@ func (e *Emulator) execInst() error {
 	case 0xFF:
 		e.codeFf()
 	default:
-		return fmt.Errorf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst()", e.eip, e.v2p(e.eip), e.getCode8(0))
+		return fmt.Errorf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst()\n", e.eip, e.v2p(e.eip), e.getCode8(0))
 	}
 	return nil
 }
