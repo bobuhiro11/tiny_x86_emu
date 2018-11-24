@@ -374,6 +374,8 @@ func (e *Emulator) execInst() error {
 		e.movEaxMoffs32()
 	case 0xA3:
 		e.movMoffs32Eax()
+	case 0xA4:
+		e.movsb()
 	case 0xA8:
 		e.testAlImm8()
 	case 0xA9:
@@ -1256,6 +1258,20 @@ func (e *Emulator) movSregRm16() {
 	rm16 := e.getRm16(m)
 	// printf("m.opecode=%d\n", m.opecode)
 	e.setSreg16(m.opecode, rm16)
+}
+
+func (e *Emulator) movsb() {
+	e.eip++
+	c := e.getMemory8(ESI)
+	e.setMemory8(EDI,c )
+
+	if e.eflags.isEnable(DirectionFlag) {
+		e.decRegister32(ESI, 1)
+		e.decRegister32(EDI, 1)
+	} else {
+		e.incRegister32(ESI, 1)
+		e.incRegister32(EDI, 1)
+	}
 }
 
 func (e *Emulator) movR8Rm8() {
