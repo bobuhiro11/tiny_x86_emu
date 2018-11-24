@@ -156,6 +156,7 @@ kvmalloc(void)
 void
 switchkvm(void)
 {
+  print_pos("switchkvm");
   lcr3(V2P(kpgdir));   // switch to the kernel page table
 }
 

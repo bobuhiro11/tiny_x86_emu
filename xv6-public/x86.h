@@ -121,6 +121,7 @@ cli(void)
 static inline void
 sti(void)
 {
+  print_pos("sti");
   asm volatile("sti");
 }
 

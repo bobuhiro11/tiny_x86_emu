@@ -344,13 +344,13 @@ scheduler(void)
       // before jumping back to us.
       c->proc = p;
       switchuvm(p);
-      cprintf("switchuvm finished.\n");
+      // cprintf("switchuvm finished.\n");
       p->state = RUNNING;
 
       cprintf("swtch new EIP=0x%p\n", p->context->eip);
       swtch(&(c->scheduler), p->context);
       switchkvm();
-      cprintf("switchkvm finished.\n");
+      // cprintf("switchkvm finished.\n");
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -402,7 +402,7 @@ yield(void)
 void
 forkret(void)
 {
-  cprintf("forkret started\n");
+  print_pos("forkret");
   static int first = 1;
   // Still holding ptable.lock from scheduler.
   release(&ptable.lock);

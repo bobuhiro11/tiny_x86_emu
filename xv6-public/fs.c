@@ -20,6 +20,7 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
+#include "x86.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
@@ -172,7 +173,7 @@ struct {
 void
 iinit(int dev)
 {
-  cprintf("iinit started\n");
+  print_pos("iinit");
   int i = 0;
   
   initlock(&icache.lock, "icache");

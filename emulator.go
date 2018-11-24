@@ -106,6 +106,8 @@ type Emulator struct {
 	eflags                 Eflags       // eflags
 	gdtrSize               uint16       // global table descriptor table's size
 	gdtrBase               uint32       // global table descriptor table's base phys address
+	idtrSize               uint16       // interrupt table descriptor table's size
+	idtrBase               uint32       // interrupt table descriptor table's base phys address
 	memory                 []uint8      // physical memory
 	eip                    uint32       // program counter
 	isSilent               bool         // silent mode
@@ -481,7 +483,13 @@ func (e *Emulator) execInst() error {
 	case 0xFF:
 		e.codeFf()
 	default:
-		return fmt.Errorf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst()\n", e.eip, e.v2p(e.eip), e.getCode8(0))
+		return fmt.Errorf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst()", e.eip, e.v2p(e.eip), e.getCode8(0))
+	}
+
+	// Jump to Interrupt Handler described in IDT
+	// Timer: # of vector is T_IRQ0 + IRQ_TIMER = 32
+	if e.eip == 0x80103ca7  && e.eflags.isEnable(InterruptFlag) {
+		printf("Insert Timer Interrupt @emu\n");
 	}
 	return nil
 }
@@ -534,7 +542,7 @@ func (e *Emulator) cli() {
 func (e *Emulator) sti() {
 	e.eflags.set(InterruptFlag)
 	e.eip++
-	printf("Enable Interruput Flag by sti inst.\n")
+	// printf("Enable Interruput Flag by sti inst.\n")
 	time.Sleep(5 * time.Second)
 }
 
@@ -616,10 +624,11 @@ func (e *Emulator) code0f() {
 			e.dumpGDTEntry(e.gdtrBase + 0x28)
 		} else if m.opecode == 3 {
 			// LIDT
-			idtrSize := e.getMemory16(address)
-			idtrBase := e.v2p(e.getMemory32(address + 2))
+			e.idtrSize = e.getMemory16(address)
+			e.idtrBase = e.v2p(e.getMemory32(address + 2))
 			printf("lidt: address=0x%x idtSize=0x%x idtBase=0x%x @emu\n",
-				address, idtrSize, idtrBase)
+				address, e.idtrSize, e.idtrBase)
+			e.dumpIDTEntry(e.idtrBase + 0x8 * 32) // IDT Entry for Timer
 		} else {
 			printf("Invalid Operation: 0x0f 0x01 but invalid opecode\n")
 		}
@@ -1716,6 +1725,19 @@ func (e *Emulator) dumpGDTEntry(physAddr uint32) {
 
 	printf("GDTEntry[%d]={entryPhysAddr=0x%x segmentBaseAddr=0x%x segmentLimit=0x%x isCodeSegment=0x%x}\n",
 		(physAddr-e.gdtrBase)/8, physAddr, segmentBaseAddr, segmentLimit, isCodeSegment)
+}
+
+// dump IDT entry
+func (e *Emulator) dumpIDTEntry(physAddr uint32) {
+	var entry uint64
+	for i := uint32(0); i < 8; i++ {
+		entry |= uint64(e.memory[physAddr+i]) << uint32(i*8)
+	}
+	offset := uint32((((entry >> 48) & 0xFFFF) << 16) | (entry & 0xFFFF))
+	sel := uint16((entry >> 16) & 0xFFFF)
+	gatetype := (entry>>40) & 0xF
+	printf("IDTEntry[%d]={entryPhysAddr=0x%x gatetype=0x%x selector=0x%x offset=0x%x}\n",
+		(physAddr-e.idtrBase)/8, physAddr, gatetype, sel, offset)
 }
 
 func (e *Emulator) setRm32(m ModRM, value uint32) {
