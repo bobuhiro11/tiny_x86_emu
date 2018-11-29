@@ -1,13 +1,15 @@
+.PHONY: rebuild build clean test
 rebuild: clean build
 build: xv6
-	go build
-	GOOS=js GOARCH=wasm go build -o ./wasm/tiny_x86_emu.wasm
+	go build -gcflags '-N -l'
+	GOOS=js GOARCH=wasm go build -gcflags '-N -l' -o ./wasm/tiny_x86_emu.wasm
 test: guest_bin xv6
 	ls qemu_xv6.log || wget https://www.dropbox.com/s/i2zwrr40zkvdjh0/qemu_xv6.log # download from cache
 	pkgs=$(go list ./... | grep -v /vendor/)
 	go vet ${pkgs}
 	golint ${pkgs} && go test ${pkgs} -v --cover -timeout 5h
 clean:
+	make -C xv6-public/ clean
 	rm ./wasm/tiny_x86_emu.wasm || true
 	go clean
 xv6:

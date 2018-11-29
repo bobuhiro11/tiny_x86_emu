@@ -251,6 +251,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 // emulate instruction
 
 func (e *Emulator) execInst() error {
+
 	switch e.getCode8(0) {
 	case 0x01:
 		e.addRm32R32()
@@ -485,7 +486,6 @@ func (e *Emulator) execInst() error {
 	default:
 		return fmt.Errorf("eip=0x%x(0x%x) opecode = %x is not implemented at execInst()", e.eip, e.v2p(e.eip), e.getCode8(0))
 	}
-
 	// Jump to Interrupt Handler described in IDT
 	// Timer: # of vector is T_IRQ0 + IRQ_TIMER = 32
 	if e.eip == 0x80103ca7  && e.eflags.isEnable(InterruptFlag) {
@@ -726,6 +726,15 @@ func (e *Emulator) code0f() {
 		}
 		e.setRegister32(m.opecode, value)
 	}
+	// panic: EIP=0x80107eff 0x0F 0x82 is not implemented
+	jb := func() {
+		// printf("jb @emu")
+		rel := e.getCode32(0)
+		e.eip += 4
+		if e.eflags.isEnable(CarryFlag) {
+			e.eip += rel
+		}
+	}
 	jne := func() {
 		rel := e.getCode32(0)
 		e.eip += 4
@@ -774,6 +783,8 @@ func (e *Emulator) code0f() {
 		movCrR32()
 	} else if second == 0x44 {
 		cmoveR32Rm32()
+	} else if second == 0x82 {
+		jb()
 	} else if second == 0x83 {
 		jae()
 	} else if second == 0x84 {
@@ -902,7 +913,6 @@ func (e *Emulator) code81() {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
 		e.eip += 4
-		// printf("rm32 value=0x%x imm32 value=0x%x\n", rm32, imm32)
 		result := uint64(rm32) + uint64(imm32)
 		e.setRm32(m, uint32(result))
 	}
@@ -925,7 +935,7 @@ func (e *Emulator) code81() {
 	cmpRm32Imm32 := func(e *Emulator, m ModRM) {
 		rm32 := e.getRm32(m)
 		imm32 := e.getCode32(0)
-		// printf("eip=%x rm32 value=0x%x imm32 value=0x%x\n", e.eip, rm32, imm32)
+		// printf("cmpRm32Imm32: eip=%x rm32 value=0x%x imm32 value=0x%x @emu\n", e.eip, rm32, imm32)
 		e.eip += 4
 		result := uint64(rm32) - uint64(imm32)
 		e.eflags.updateBySub(rm32, imm32, result)
