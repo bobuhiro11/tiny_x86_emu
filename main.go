@@ -99,7 +99,7 @@ func main() {
 		os.Exit(1)
 	}
 	// printf("enable GUI = %#v\n", *enableGUI)
-	printf("len(bytes) = %d\n", len(bytes))
+	// printf("len(bytes) = %d\n", len(bytes))
 	// printf("bytes =\n%s", hex.Dump(bytes))
 
 	// setup emulator

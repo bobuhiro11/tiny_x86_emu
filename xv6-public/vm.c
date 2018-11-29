@@ -26,7 +26,7 @@ seginit(void)
   c->gdt[SEG_KDATA] = SEG(STA_W, 0, 0xffffffff, 0);
   c->gdt[SEG_UCODE] = SEG(STA_X|STA_R, 0, 0xffffffff, DPL_USER);
   c->gdt[SEG_UDATA] = SEG(STA_W, 0, 0xffffffff, DPL_USER);
-  cprintf("seginit: gdt address=0x%p size=0x%p @kernel\n", c->gdt, sizeof(c->gdt));
+  // cprintf("seginit: gdt address=0x%p size=0x%p @kernel\n", c->gdt, sizeof(c->gdt));
   lgdt(c->gdt, sizeof(c->gdt));
 }
 
@@ -135,10 +135,10 @@ setupkvm(void)
       freevm(pgdir);
       return 0;
     }
-    cprintf("virt=0x%p phys_start=0x%p phys_end=0x%p perm=0x%p\n",
-            k->virt, k->phys_start, k->phys_end, k->perm);
+    // cprintf("virt=0x%p phys_start=0x%p phys_end=0x%p perm=0x%p\n",
+    //         k->virt, k->phys_start, k->phys_end, k->perm);
   }
-  cprintf("address of pgdir is 0x%p\n", pgdir);
+  // cprintf("address of pgdir is 0x%p\n", pgdir);
   return pgdir;
 }
 
@@ -173,7 +173,7 @@ switchuvm(struct proc *p)
 
   pushcli();
   struct cpu *c = mycpu();
-  cprintf("switchuvm: base address of ts=0x%p, &(ts->ss0)=0x%p gdt base=0x%p @kernel\n", &(c->ts), &(c->ts.ss0),c->gdt); // base address of ts=0x80112788
+  // cprintf("switchuvm: base address of ts=0x%p, &(ts->ss0)=0x%p gdt base=0x%p @kernel\n", &(c->ts), &(c->ts.ss0),c->gdt); // base address of ts=0x80112788
   mycpu()->gdt[SEG_TSS] = SEG16(STS_T32A, &mycpu()->ts,
                                 sizeof(mycpu()->ts)-1, 0);
   mycpu()->gdt[SEG_TSS].s = 0;

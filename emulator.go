@@ -235,7 +235,7 @@ func NewEmulator(memorySize, eip, esp uint32, protectedMode, isSilent bool, read
 	e.memory[0x040F] = uint8(EBDABase >> 12)
 
 	// setup EBDA (struct mp) at EBDABase
-	printf("EBDA address=0x%X\n", ((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
+	// printf("EBDA address=0x%X\n", ((uint32(e.memory[0x040f])<<8)|uint32(e.memory[0x040e]))<<4)
 	for i, val := range getEBDA() {
 		e.memory[EBDABase+uint32(i)] = val
 	}
@@ -613,22 +613,22 @@ func (e *Emulator) code0f() {
 			// LGDT
 			e.gdtrSize = e.getMemory16(address)
 			e.gdtrBase = e.v2p(e.getMemory32(address + 2))
-			printf("lgdt: address=0x%x gdtSize=0x%x gdtBase=0x%x @emu\n",
-				address, e.gdtrSize, e.gdtrBase)
+			// printf("lgdt: address=0x%x gdtSize=0x%x gdtBase=0x%x @emu\n",
+				// address, e.gdtrSize, e.gdtrBase)
 
-			e.dumpGDTEntry(e.gdtrBase)
-			e.dumpGDTEntry(e.gdtrBase + 0x8)
-			e.dumpGDTEntry(e.gdtrBase + 0x10)
-			e.dumpGDTEntry(e.gdtrBase + 0x18)
-			e.dumpGDTEntry(e.gdtrBase + 0x20)
-			e.dumpGDTEntry(e.gdtrBase + 0x28)
+			// e.dumpGDTEntry(e.gdtrBase)
+			// e.dumpGDTEntry(e.gdtrBase + 0x8)
+			// e.dumpGDTEntry(e.gdtrBase + 0x10)
+			// e.dumpGDTEntry(e.gdtrBase + 0x18)
+			// e.dumpGDTEntry(e.gdtrBase + 0x20)
+			// e.dumpGDTEntry(e.gdtrBase + 0x28)
 		} else if m.opecode == 3 {
 			// LIDT
 			e.idtrSize = e.getMemory16(address)
 			e.idtrBase = e.v2p(e.getMemory32(address + 2))
-			printf("lidt: address=0x%x idtSize=0x%x idtBase=0x%x @emu\n",
-				address, e.idtrSize, e.idtrBase)
-			e.dumpIDTEntry(e.idtrBase + 0x8 * 32) // IDT Entry for Timer
+			// printf("lidt: address=0x%x idtSize=0x%x idtBase=0x%x @emu\n",
+				// address, e.idtrSize, e.idtrBase)
+			// e.dumpIDTEntry(e.idtrBase + 0x8 * 32) // IDT Entry for Timer
 		} else {
 			printf("Invalid Operation: 0x0f 0x01 but invalid opecode\n")
 		}
@@ -665,22 +665,22 @@ func (e *Emulator) code0f() {
 		// if m.opecode == 4 && e.cr[m.opecode]&CR4PageSizeExtension != 0 {
 		if m.opecode == 3 {
 			if e.cr[4]&CR4PageSizeExtension != 0 {
-				printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
+				// printf("CR4 page size sxtension Enabled (Page size is 4MB).\n")
 				e.PageSizeExtensionEable = true
 			} else {
-				printf("CR4 page size sxtension Disabled (Page size is 4KB).\n")
+				// printf("CR4 page size sxtension Disabled (Page size is 4KB).\n")
 				e.PageSizeExtensionEable = false
 			}
 			e.cr[4] &^= CR4PageSizeExtension
-			printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode]>>12)
-			printf("Page Directory Table[%d] = 0x%08x\n",
-				0, e.getMemory32((e.cr[m.opecode]>>22)+4*0))
-			printf("Page Directory Table[%d] = 0x%08x\n",
-				512, e.getMemory32((e.cr[m.opecode]>>22)+4*512))
-			printf("Page Directory Table[%d] = 0x%08x\n",
-				513, e.getMemory32((e.cr[m.opecode]>>22)+4*513))
+			// printf("CR3 Page Directory Table is at 0x%08x\n", e.cr[m.opecode]>>12)
+			// printf("Page Directory Table[%d] = 0x%08x\n",
+			// 	0, e.getMemory32((e.cr[m.opecode]>>22)+4*0))
+			// printf("Page Directory Table[%d] = 0x%08x\n",
+			// 	512, e.getMemory32((e.cr[m.opecode]>>22)+4*512))
+			// printf("Page Directory Table[%d] = 0x%08x\n",
+			// 	513, e.getMemory32((e.cr[m.opecode]>>22)+4*513))
 		} else if m.opecode == 0 && e.cr[m.opecode]&CR0PagingFlag != 0 {
-			printf("CR0 paging is Enabled.\n")
+			// printf("CR0 paging is Enabled.\n")
 		}
 	}
 	MovzxR32Rm8 := func() {
