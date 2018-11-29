@@ -149,7 +149,7 @@ rcr2(void)
 static inline void
 lcr3(uint val)
 {
-  // cprintf("mov 0x%p -> cr3\n", val);
+  cprintf("mov 0x%p -> cr3\n", val);
   asm volatile("movl %0,%%cr3" : : "r" (val));
 }
 

@@ -107,15 +107,15 @@ mpconfig(struct mp **pmp)
   return conf;
 }
 
-volatile void
+void
 mpinit(void)
 {
-  volatile uchar *p, *e;
-  volatile int ismp;
-  volatile struct mp *mp;
-  volatile struct mpconf *conf;
-  volatile struct mpproc *proc;
-  volatile struct mpioapic *ioapic;
+  uchar *p, *e;
+  int ismp;
+  struct mp *mp;
+  struct mpconf *conf;
+  struct mpproc *proc;
+  struct mpioapic *ioapic;
 
   if((conf = mpconfig(&mp)) == 0)
     panic("Expect to run on an SMP");
@@ -129,7 +129,7 @@ mpinit(void)
   for(p=(uchar*)(conf+1), e=(uchar*)conf+conf->length; p<e; ){
     cprintf("p=%p e=%p lapic=%p length=%d conf=%p *length=%p\n",p,e,lapic, *((ushort*)&(conf->length)), conf,
             ((ushort*)&(conf->length)));
-    // cprintf("*p=%d, MPPROC=%d\n",*p,MPPROC);
+    cprintf("*p=%d, MPPROC=%d\n",*p,MPPROC);
     switch(*p){
     case MPPROC: // 0x00
       proc = (struct mpproc*)p;
