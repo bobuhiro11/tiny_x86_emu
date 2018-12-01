@@ -332,6 +332,7 @@ scheduler(void)
   for(;;){
     // Enable interrupts on this processor.
     sti();
+    cprintf("sti at scheduler\n");
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
@@ -371,6 +372,7 @@ scheduler(void)
 void
 sched(void)
 {
+  print_pos("sched");
   int intena;
   struct proc *p = myproc();
 
@@ -425,6 +427,7 @@ forkret(void)
 void
 sleep(void *chan, struct spinlock *lk)
 {
+  print_pos("sleep");
   struct proc *p = myproc();
   
   if(p == 0)

@@ -31,6 +31,9 @@
 
 // Contents of the header block, used for both the on-disk header block
 // and to keep track in memory of logged block# before commit.
+//
+#include "x86.h"
+
 struct logheader {
   int n;
   int block[LOGSIZE];
@@ -53,6 +56,7 @@ static void commit();
 void
 initlog(int dev)
 {
+  print_pos("initlog");
   cprintf("initlog started\n");
   if (sizeof(struct logheader) >= BSIZE)
     panic("initlog: too big logheader");
