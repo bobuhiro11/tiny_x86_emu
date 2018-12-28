@@ -1,53 +1,67 @@
-LD_OPT=-m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00
+QEMU_XV6_LOG_URL=https://www.dropbox.com/s/i2zwrr40zkvdjh0/qemu_xv6.log
 
-.PHONY: rebuild build clean test goget xv6 guest_bin
-rebuild: clean build
-build: xv6
-	go build -gcflags '-N -l'
-	GOOS=js GOARCH=wasm go build -gcflags '-N -l' -o ./wasm/tiny_x86_emu.wasm
-test: guest_bin xv6
-	ls qemu_xv6.log || wget https://www.dropbox.com/s/i2zwrr40zkvdjh0/qemu_xv6.log # download from cache
-	pkgs=$(go list ./... | grep -v /vendor/)
-	go vet ${pkgs}
-	golint ${pkgs} && go test ${pkgs} -v --cover -timeout 5h
+GO_BUILD_OPT=-gcflags '-N -l'
+LD_OPT=-m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00
+CC= -nostdlib -fno-pie -fno-asynchronous-unwind-tables -g -fno-stack-protector
+
+SRCS=$(shell find . -type f -name '*.go')
+PKGS=$(go list ./... | grep -v /vendor/)
+GUEST_BINARIES=guest/test.bin guest/test132.bin guest/test133.bin \
+			   guest/test134.bin guest/test135.bin guest/addjmp.bin \
+			   guest/modrm-test.bin guest/call-test.bin guest/test141.bin \
+			   guest/test143.bin guest/mbr.bin
+GO_GET_PKGS=github.com/mattn/goveralls \
+			github.com/goreleaser/goreleaser \
+			github.com/golang/lint/golint \
+			github.com/jessevdk/go-assets \
+			gopkg.in/yaml.v2 \
+			github.com/jessevdk/go-assets-builder
+
+.SUFFIX: .bin
+
+.PHONY: all
+all: tiny_x86_emu wasm/tiny_x86_emu.wasm
+
+.PHONY: test
+test: goget $(GUEST_BINARIES) xv6-public/xv6.img qemu_xv6.log
+	go vet $(PKGS) && golint $(PKGS) && go test $(PKGS) -v --cover -timeout 5h
+
+.PHONY: clean
 clean:
 	make -C xv6-public/ clean
-	rm ./wasm/tiny_x86_emu.wasm || true
+	rm -f tiny_x86_emu wasm/tiny_x86_emu.wasm guest/*.bin guest/*.o
 	go clean
+
+.PHONY: goget
 goget:
-	go get github.com/mattn/goveralls
-	go get github.com/goreleaser/goreleaser
-	go get github.com/golang/lint/golint
-	go get github.com/jessevdk/go-assets
-	go get gopkg.in/yaml.v2
-	go get github.com/jessevdk/go-assets-builder
-xv6:
-	if [ ! -d xv6-public ]; then git clone --depth 1 https://github.com/mit-pdos/xv6-public.git; fi
-	make -C ./xv6-public
-	go-assets-builder ./xv6-public/xv6.img > assets.go
-guest_bin:
-	# binary from gcc
-	gcc -Wl,--entry=inc,--oformat=binary -nostdlib -fno-asynchronous-unwind-tables \
-		-o guest/inc.bin guest/inc.c
-	# binary from nasm
-	for name in addjmp modrm-test call-test test141 test143 mbr; do \
-		nasm -f bin ./guest/$${name}.asm -o ./guest/$${name}.bin ; \
-	done
-	# elf from gcc
-	for name in test test132 test133 test134 test135 ; do \
-		gcc -nostdlib -fno-pie -fno-asynchronous-unwind-tables -g -fno-stack-protector -m32 \
-		-c guest/$${name}.c -o guest/$${name}.o ; \
-	done
-	# elf from nasm
-	nasm -f elf guest/crt0.asm
-	# link
-	ld ${LD_OPT} -o guest/test.bin guest/crt0.o    guest/test.o
-	ld ${LD_OPT} -o guest/test132.bin guest/crt0.o guest/test132.o
-	ld ${LD_OPT} -o guest/test133.bin guest/crt0.o guest/test133.o
-	ld ${LD_OPT} -o guest/test134.bin guest/crt0.o guest/test134.o
-	ld ${LD_OPT} -o guest/test135.bin guest/crt0.o guest/test135.o
-	# disasm
-	# objdump -D -b binary -m i386:x86-64 ./guest/addjmp.bin
-	# ndisasm -b 32 guest/test143.bin
-	# hexdump -C guest/inc.bin
-	# ./dump_registers.sh
+	go get $(GO_GET_PKGS)
+
+.PHONY: qemu_xv6.log
+qemu_xv6.log:
+	wget --no-clobber $(QEMU_XV6_LOG_URL)
+
+.PHONY: xv6-public/xv6.img
+xv6-public/xv6.img:
+	make -C ./xv6-public xv6.img
+
+tiny_x86_emu: goget xv6-public/xv6.img assets.go $(SRCS) 
+	go build $(GO_BUILD_OPT)
+
+wasm/tiny_x86_emu.wasm: goget xv6-public/xv6.img assets.go $(SRCS) 
+	GOOS=js GOARCH=wasm go build $(GO_BUILD_OPT) -o $@
+
+assets.go: xv6-public/xv6.img
+	go-assets-builder $< > $@
+
+guest/inc.bin: guest/inc.c
+	gcc -Wl,--entry=inc,--oformat=binary $(CC) -o $@ $<
+
+guest/crt0.o: guest/crt0.asm
+	nasm -f elf $<
+
+%.bin: %.c guest/crt0.o
+	gcc $(CC) -m32 -c $< -o $*.o
+	ld $(LD_OPT) guest/crt0.o $*.o -o $@
+
+%.bin: %.asm
+	nasm -f bin $< -o $@

@@ -20,14 +20,10 @@ build:
           nasm -v
           ndisasm -v
     - script:
-        name: go get
-        code: |
-          make goget
-    - script:
-        name: go build
-        code: |
-          make build
-    - script:
-        name: go test
+        name: testing
         code: |
           make test
+    - script:
+        name: building
+        code: |
+          make all
