@@ -28,7 +28,7 @@ test: goget $(GUEST_BINARIES) xv6-public/xv6.img qemu_xv6.log
 
 .PHONY: clean
 clean:
-	make -C xv6-public/ clean
+	make --quiet -C xv6-public/ clean
 	rm -f tiny_x86_emu wasm/tiny_x86_emu.wasm guest/*.bin guest/*.o
 	go clean
 
@@ -42,7 +42,7 @@ qemu_xv6.log:
 
 .PHONY: xv6-public/xv6.img
 xv6-public/xv6.img:
-	make -C ./xv6-public xv6.img
+	make --quiet -C ./xv6-public xv6.img
 
 tiny_x86_emu: goget xv6-public/xv6.img assets.go $(SRCS) 
 	go build $(GO_BUILD_OPT)
