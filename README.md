@@ -9,7 +9,7 @@ Tiny x86 Emulator
 $ sudo apt install libgl1-mesa-dev xorg-dev
 $ make
 
-# compile for windows on ubuntu
+# compile for ubuntu on windows
 $ sudo apt install mingw-w64
 $ CGO_ENABLED=1 CXX=x86_64-w64-mingw32-g++ CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 go build
 ```

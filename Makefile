@@ -1,4 +1,6 @@
-.PHONY: rebuild build clean test
+LD_OPT=-m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00
+
+.PHONY: rebuild build clean test goget xv6 guest_bin
 rebuild: clean build
 build: xv6
 	go build -gcflags '-N -l'
@@ -12,6 +14,13 @@ clean:
 	make -C xv6-public/ clean
 	rm ./wasm/tiny_x86_emu.wasm || true
 	go clean
+goget:
+	go get github.com/mattn/goveralls
+	go get github.com/goreleaser/goreleaser
+	go get github.com/golang/lint/golint
+	go get github.com/jessevdk/go-assets
+	go get gopkg.in/yaml.v2
+	go get github.com/jessevdk/go-assets-builder
 xv6:
 	if [ ! -d xv6-public ]; then git clone --depth 1 https://github.com/mit-pdos/xv6-public.git; fi
 	make -C ./xv6-public
@@ -32,16 +41,11 @@ guest_bin:
 	# elf from nasm
 	nasm -f elf guest/crt0.asm
 	# link
-	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
-		-o guest/test.bin guest/crt0.o guest/test.o
-	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
-		-o guest/test132.bin guest/crt0.o guest/test132.o
-	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
-		-o guest/test133.bin guest/crt0.o guest/test133.o
-	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
-		-o guest/test134.bin guest/crt0.o guest/test134.o
-	ld -m elf_i386 --entry=start --oformat=binary -Ttext 0x7c00 \
-		-o guest/test135.bin guest/crt0.o guest/test135.o
+	ld ${LD_OPT} -o guest/test.bin guest/crt0.o    guest/test.o
+	ld ${LD_OPT} -o guest/test132.bin guest/crt0.o guest/test132.o
+	ld ${LD_OPT} -o guest/test133.bin guest/crt0.o guest/test133.o
+	ld ${LD_OPT} -o guest/test134.bin guest/crt0.o guest/test134.o
+	ld ${LD_OPT} -o guest/test135.bin guest/crt0.o guest/test135.o
 	# disasm
 	# objdump -D -b binary -m i386:x86-64 ./guest/addjmp.bin
 	# ndisasm -b 32 guest/test143.bin
