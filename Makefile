@@ -20,7 +20,7 @@ GO_GET_PKGS=github.com/mattn/goveralls \
 .SUFFIX: .bin
 
 .PHONY: all
-all: tiny_x86_emu wasm/tiny_x86_emu.wasm
+all: tiny_x86_emu wasm/tiny_x86_emu.wasm httpserv
 
 .PHONY: test
 test: goget $(GUEST_BINARIES) xv6-public/xv6.img qemu_xv6.log
@@ -29,7 +29,7 @@ test: goget $(GUEST_BINARIES) xv6-public/xv6.img qemu_xv6.log
 .PHONY: clean
 clean:
 	make --quiet -C xv6-public/ clean
-	rm -f tiny_x86_emu wasm/tiny_x86_emu.wasm guest/*.bin guest/*.o
+	rm -f tiny_x86_emu wasm/tiny_x86_emu.wasm httpserv guest/*.bin guest/*.o
 	go clean
 
 .PHONY: goget
@@ -49,6 +49,9 @@ tiny_x86_emu: goget xv6-public/xv6.img assets.go $(SRCS)
 
 wasm/tiny_x86_emu.wasm: goget xv6-public/xv6.img assets.go $(SRCS) 
 	GOOS=js GOARCH=wasm go build $(GO_BUILD_OPT) -o $@
+
+httpserv: script/httpserv.go
+	go build -o httpserv ./script/httpserv.go
 
 assets.go: xv6-public/xv6.img
 	go-assets-builder $< > $@

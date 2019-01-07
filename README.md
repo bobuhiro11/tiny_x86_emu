@@ -27,8 +27,8 @@ $ make
 $ ./tiny_x86_emu -f xv6-public/xv6.img
 
 # Start web server to host wasm file.
-# Then, please open http://localhost:8000/wasm in your browser.
-$ ./httpserv.py
+# Then, please open http://localhost:8000 in your browser.
+$ ./httpserv
 ```
 
 ## Testing
