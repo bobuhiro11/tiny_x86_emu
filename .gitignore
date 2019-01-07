@@ -28,3 +28,4 @@ tags
 *.swo
 *.log
 assets.go
+httpserv
