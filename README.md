@@ -1,4 +1,4 @@
-# tiny_x86_emu [![wercker status](https://app.wercker.com/status/7ac504b68746c744dd7dc4b5e52e4735/s/master "wercker status")](https://app.wercker.com/project/byKey/7ac504b68746c744dd7dc4b5e52e4735)
+# tiny_x86_emu [![wercker status](https://app.wercker.com/status/7ac504b68746c744dd7dc4b5e52e4735/s/master "wercker status")](https://app.wercker.com/project/byKey/7ac504b68746c744dd7dc4b5e52e4735) [![GoDoc](https://godoc.org/github.com/nmi/tiny_x86_emu?status.svg)](https://godoc.org/github.com/nmi/tiny_x86_emu) [![Go Report Card](https://goreportcard.com/badge/github.com/nmi/tiny_x86_emu)](https://goreportcard.com/report/github.com/nmi/tiny_x86_emu) ![](https://img.shields.io/github/license/nmi/tiny_x86_emu.svg) [![Coverage Status](https://coveralls.io/repos/github/nmi/tiny_x86_emu/badge.svg)](https://coveralls.io/github/nmi/tiny_x86_emu)
 
 This is an experimental x86 emulator. Currently, this project is targeted only to xv6 as guest OS.
 
