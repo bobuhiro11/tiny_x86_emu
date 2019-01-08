@@ -8,9 +8,16 @@ https://bobuhiro11.net/tiny_x86_emu/
 
 ![screenshot](https://raw.githubusercontent.com/nmi/tiny_x86_emu/master/screenshot.png)
 
-## preparation
+## Preparation
 
-Please make sure that make, go (>1.11), gcc, objdump, nasm and ndisasm are installed.
+Please make sure that make, go (>=1.11), gcc, objdump, nasm and ndisasm are installed.
+For example, if you are using ubuntu, you can install them using the following command.
+
+```bash
+$ sudo apt-get install -y nasm gcc git tar wget make bsdmainutils
+$ wget https://dl.google.com/go/go1.11.linux-amd64.tar.gz
+$ sudo tar -C /usr/local -zxf go1.11.linux-amd64.tar.gz
+```
 
 ## Usage
 
