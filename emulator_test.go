@@ -112,11 +112,11 @@ func TestMbr(t *testing.T) {
 func run(t *testing.T, filename string, protectedEnable bool) (*Emulator, string) {
 	bin, err := LoadFile(filename)
 	if err != nil {
-		t.Fatal(err.Error())
+		// the guest binaries are built by the makefile and need nasm
+		t.Skipf("%s is missing, run make first: %v", filename, err)
 	}
-	reader := &bytes.Buffer{}
 	writer := &bytes.Buffer{}
-	e := NewEmulator(0x7c00+0x10000, 0x7c00, 0x7c00, protectedEnable, true, reader, writer, map[uint64]string{})
+	e := NewEmulator(0x7c00, 0x7c00, protectedEnable, writer, map[uint64]string{})
 	// for i := uint32(0); i < 0x7c00 + 0x10000; i++ {
 	// 	e.memory[i] = 0
 	// }
@@ -128,7 +128,7 @@ func run(t *testing.T, filename string, protectedEnable bool) (*Emulator, string
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		if e.eip == 0 || e.eip == 0x7c00 {
+		if e.eip == 0 || e.eip == 0x7c00 || e.shutdown {
 			break
 		}
 	}
