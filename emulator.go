@@ -18,7 +18,7 @@ const (
 
 	// PHYSTOP is the size of the physical memory of the machine. It has to
 	// match the PHYSTOP of the guest (see xv6-public/memlayout.h).
-	PHYSTOP = uint32(0x1000000)
+	PHYSTOP = uint32(0xE000000)
 
 	// DEVSPACE is the start of the memory mapped devices.
 	DEVSPACE = uint32(0xFE000000)

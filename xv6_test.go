@@ -90,6 +90,50 @@ func TestXv6Boot(t *testing.T) {
 	}
 }
 
+// bootXv6Writable boots with a scratch copy of the file system image, so that
+// the guest can write to its disk without touching the image of the repository.
+func bootXv6Writable(t *testing.T) (*Emulator, *console) {
+	t.Helper()
+	image, err := os.ReadFile("xv6-public/fs.img")
+	if err != nil {
+		t.Skipf("xv6-public/fs.img is missing, run make first: %v", err)
+	}
+	path := t.TempDir() + "/fs.img"
+	if err := os.WriteFile(path, image, 0644); err != nil {
+		t.Fatal(err)
+	}
+	fs, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fs.Close() })
+
+	e, out := bootXv6(t)
+	e.io.hdds[1] = NewDisk(fs)
+	return e, out
+}
+
+// TestXv6Usertests runs the whole test suite which comes with xv6. It takes a
+// few minutes, so it only runs when USERTESTS is set in the environment.
+func TestXv6Usertests(t *testing.T) {
+	if os.Getenv("USERTESTS") == "" {
+		t.Skip("set USERTESTS=1 to run the xv6 test suite")
+	}
+	e, out := bootXv6Writable(t)
+	runUntil(t, e, out, "init: starting sh", 200*1000*1000)
+
+	for _, b := range []byte("usertests\n") {
+		e.io.PushInput(b)
+	}
+	runUntil(t, e, out, "ALL TESTS PASSED", 200*1000*1000*1000)
+
+	for _, bad := range []string{"FAILED", "panic", "failed"} {
+		if strings.Contains(out.String(), bad) {
+			t.Errorf("%q shows up in the output of usertests:\n%s", bad, out.String())
+		}
+	}
+}
+
 // TestXv6Shell types a command into the shell and checks its output.
 func TestXv6Shell(t *testing.T) {
 	if testing.Short() {
