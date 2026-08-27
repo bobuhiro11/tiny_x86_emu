@@ -18,7 +18,7 @@ GOROOT=$(shell go env GOROOT)
 all: tiny_x86_emu wasm/tiny_x86_emu.wasm httpserv
 
 .PHONY: test
-test: xv6-public/xv6.img xv6-public/fs.img
+test: $(GUEST_BINARIES) xv6-public/xv6.img xv6-public/fs.img
 	go vet $(PKGS) && go test $(PKGS) -v --cover -timeout 30m
 
 .PHONY: clean
