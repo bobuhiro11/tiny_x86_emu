@@ -89,7 +89,11 @@ getcallerpcs(void *v, uint pcs[])
 int
 holding(struct spinlock *lock)
 {
-  return lock->locked && lock->cpu == mycpu();
+  int r;
+  pushcli();
+  r = lock->locked && lock->cpu == mycpu();
+  popcli();
+  return r;
 }
 
 
@@ -112,13 +116,11 @@ pushcli(void)
 void
 popcli(void)
 {
-  // cprintf("popcli started\n");
   if(readeflags()&FL_IF)
     panic("popcli - interruptible");
   if(--mycpu()->ncli < 0)
     panic("popcli");
   if(mycpu()->ncli == 0 && mycpu()->intena)
     sti();
-  // cprintf("popcli finished\n");
 }
 

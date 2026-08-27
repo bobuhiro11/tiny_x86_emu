@@ -25,7 +25,6 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "buf.h"
-#include "x86.h"
 
 struct {
   struct spinlock lock;
@@ -62,7 +61,6 @@ binit(void)
 static struct buf*
 bget(uint dev, uint blockno)
 {
-  print_pos("bget");
   struct buf *b;
 
   acquire(&bcache.lock);
@@ -98,7 +96,6 @@ bget(uint dev, uint blockno)
 struct buf*
 bread(uint dev, uint blockno)
 {
-  print_pos("bread");
   struct buf *b;
 
   b = bget(dev, blockno);

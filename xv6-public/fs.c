@@ -20,7 +20,6 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
-#include "x86.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
@@ -32,7 +31,6 @@ struct superblock sb;
 void
 readsb(int dev, struct superblock *sb)
 {
-  print_pos("readsb");
   struct buf *bp;
 
   bp = bread(dev, 1);
@@ -86,7 +84,6 @@ bfree(int dev, uint b)
   struct buf *bp;
   int bi, m;
 
-  readsb(dev, &sb);
   bp = bread(dev, BBLOCK(b, sb));
   bi = b % BPB;
   m = 1 << (bi % 8);
@@ -174,7 +171,6 @@ struct {
 void
 iinit(int dev)
 {
-  print_pos("iinit");
   int i = 0;
   
   initlock(&icache.lock, "icache");
