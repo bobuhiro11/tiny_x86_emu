@@ -14,8 +14,7 @@
 
 #define COM1    0x3f8
 
-// NOTE(nmi): always enable for debugging 
-static int uart=1;    // is there a uart?
+static int uart;    // is there a uart?
 
 void
 uartinit(void)
@@ -45,7 +44,6 @@ uartinit(void)
   ioapicenable(IRQ_COM1, 0);
 
   // Announce that we're here.
-  // uartputc('#');
   for(p="xv6...\n"; *p; p++)
     uartputc(*p);
 }
