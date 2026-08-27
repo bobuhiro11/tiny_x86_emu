@@ -37,13 +37,14 @@ The console of the guest is the serial port: what xv6 writes to COM1 shows up
 on the terminal, and what you type is delivered to the guest as a COM1
 interrupt.
 
-The machine has 16MB of RAM (see `PHYSTOP` in `xv6-public/memlayout.h` and
-`emulator.go`, both have to agree). That is plenty for the shell and the user
-programs, but not for the part of `usertests` which grows a process to 100MB.
+The machine has the 224MB of RAM xv6 expects by default (see `PHYSTOP` in
+`xv6-public/memlayout.h` and `emulator.go`, both have to agree). The emulator
+allocates all of it up front and xv6 clears it while booting, which is most of
+the few seconds the boot takes in the browser.
 
 ## Preparation
 
-Please make sure that make, go (>=1.16), gcc, objdump, nasm and ndisasm are
+Please make sure that make, go (>=1.21), gcc, objdump, nasm and ndisasm are
 installed. For example, if you are using ubuntu, you can install them using the
 following command.
 
@@ -89,6 +90,13 @@ command into its shell:
 
 ```bash
 $ go test -run TestXv6 -v .
+```
+
+The whole test suite which comes with xv6 runs as well. It takes a few
+minutes, so it is opt in:
+
+```bash
+$ USERTESTS=1 go test -run TestXv6Usertests -v -timeout 30m .
 ```
 
 ## Contribution
