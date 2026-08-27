@@ -1,58 +1,242 @@
 <!doctype html>
-<!--
-Copyright 2018 The Go Authors. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
--->
-<html>
+<html lang="en">
 
 <head>
 	<meta charset="utf-8">
-	<title>WIP: tiny x86 emu</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>tiny x86 emu - xv6 in your browser</title>
+	<style>
+		:root {
+			--bg: #12141a;
+			--fg: #d8dee9;
+			--accent: #8fbcbb;
+			--term-bg: #05070a;
+			--term-fg: #d6ffd6;
+		}
+
+		body {
+			margin: 0;
+			padding: 2rem 1rem 3rem;
+			background: var(--bg);
+			color: var(--fg);
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			line-height: 1.5;
+		}
+
+		main {
+			max-width: 860px;
+			margin: 0 auto;
+		}
+
+		h1 {
+			font-size: 1.5rem;
+			margin: 0 0 .25rem;
+		}
+
+		h1 span {
+			color: var(--accent);
+		}
+
+		p.lead {
+			margin: 0 0 1.5rem;
+			color: #9aa5b1;
+			font-size: .95rem;
+		}
+
+		#screen {
+			background: var(--term-bg);
+			border: 1px solid #262b36;
+			border-radius: 6px;
+			padding: .75rem 1rem;
+			height: 60vh;
+			min-height: 380px;
+			overflow: auto;
+			cursor: text;
+		}
+
+		#terminal {
+			margin: 0;
+			display: inline;
+			color: var(--term-fg);
+			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+			font-size: 14px;
+			line-height: 1.35;
+			white-space: pre-wrap;
+			word-break: break-word;
+		}
+
+		#cursor {
+			display: inline-block;
+			width: .55em;
+			height: 1em;
+			vertical-align: text-bottom;
+			background: var(--term-fg);
+			animation: blink 1.1s step-end infinite;
+		}
+
+		@keyframes blink {
+
+			0%,
+			100% {
+				opacity: 1;
+			}
+
+			50% {
+				opacity: 0;
+			}
+		}
+
+		#status {
+			margin-top: .75rem;
+			font-size: .85rem;
+			color: #7c8794;
+			display: flex;
+			gap: 1rem;
+			align-items: center;
+			flex-wrap: wrap;
+		}
+
+		button {
+			font: inherit;
+			background: var(--accent);
+			color: #10141a;
+			border: 0;
+			border-radius: 4px;
+			padding: .35rem .9rem;
+			cursor: pointer;
+		}
+
+		button:disabled {
+			opacity: .45;
+			cursor: default;
+		}
+
+		code {
+			background: #1c212b;
+			padding: .1rem .35rem;
+			border-radius: 3px;
+		}
+
+		a {
+			color: var(--accent);
+		}
+	</style>
 </head>
 
-<style>
-#terminal {
-    background-color: black;
-    color: white;
-    font-family: "Courier New", Consolas, monospace;
-    width: 800px;
-    height: 600px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-</style>
-
 <body>
+	<main>
+		<h1>tiny <span>x86</span> emu</h1>
+		<p class="lead">
+			An experimental x86 emulator written in Go, compiled to WebAssembly, booting
+			<a href="https://github.com/mit-pdos/xv6-public">xv6</a> from an emulated IDE disk.
+			Click the screen and type: try <code>ls</code>, <code>cat README</code>, <code>echo hi</code> or
+			<code>forktest</code>.
+		</p>
+
+		<div id="screen"><pre id="terminal"></pre><span id="cursor"></span></div>
+
+		<div id="status">
+			<button id="runButton" disabled>Boot</button>
+			<span id="state">loading emulator...</span>
+		</div>
+	</main>
+
 	<script src="wasm_exec.js"></script>
 	<script>
-		if (!WebAssembly.instantiateStreaming) { // polyfill
-			WebAssembly.instantiateStreaming = async (resp, importObject) => {
-				const source = await (await resp).arrayBuffer();
-				return await WebAssembly.instantiate(source, importObject);
+		(function () {
+			const term = document.getElementById("terminal");
+			const screen = document.getElementById("screen");
+			const state = document.getElementById("state");
+			const runButton = document.getElementById("runButton");
+
+			// The guest only writes plain text, backspace, carriage return and
+			// newline, so keeping the screen in a string is enough.
+			let buffer = "";
+			let pending = false;
+
+			function render() {
+				pending = false;
+				term.textContent = buffer;
+				screen.scrollTop = screen.scrollHeight;
+			}
+
+			window.emuWrite = function (s) {
+				for (const ch of s) {
+					if (ch === "\b") {
+						buffer = buffer.slice(0, -1);
+					} else if (ch !== "\r") {
+						buffer += ch;
+					}
+				}
+				if (buffer.length > 200000) { // bound the scrollback
+					buffer = buffer.slice(-150000);
+				}
+				if (!pending) {
+					pending = true;
+					requestAnimationFrame(render);
+				}
 			};
-		}
 
-		const go = new Go();
-		let mod, inst;
-		WebAssembly.instantiateStreaming(fetch("tiny_x86_emu.wasm"), go.importObject).then((result) => {
-			mod = result.module;
-			inst = result.instance;
-			document.getElementById("runButton").disabled = false;
-		});
+			window.emuReady = function () {
+				state.textContent = "running - click the screen and type";
+			};
 
-		async function run() {
-			document.getElementById("runButton").disabled = true;
-			console.clear();
-			await go.run(inst);
-			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
-		}
+			function keyToBytes(ev) {
+				if (ev.ctrlKey) {
+					if (ev.key.length !== 1) {
+						return "";
+					}
+					const c = ev.key.toUpperCase().charCodeAt(0);
+					return (c >= 64 && c < 96) ? String.fromCharCode(c - 64) : "";
+				}
+				switch (ev.key) {
+					case "Enter": return "\n";
+					case "Backspace": return "\x7f";
+					case "Tab": return "\t";
+					case "Escape": return "\x1b";
+					default: return ev.key.length === 1 ? ev.key : "";
+				}
+			}
+
+			document.addEventListener("keydown", function (ev) {
+				if (!window.emuKey || ev.metaKey || ev.altKey) {
+					return;
+				}
+				const s = keyToBytes(ev);
+				if (s !== "") {
+					ev.preventDefault();
+					window.emuKey(s);
+				}
+			});
+
+			if (!WebAssembly.instantiateStreaming) { // polyfill
+				WebAssembly.instantiateStreaming = async (resp, importObject) => {
+					const source = await (await resp).arrayBuffer();
+					return await WebAssembly.instantiate(source, importObject);
+				};
+			}
+
+			const go = new Go();
+
+			WebAssembly.instantiateStreaming(fetch("tiny_x86_emu.wasm"), go.importObject).then((result) => {
+				boot(result.instance);
+			}).catch((err) => {
+				state.textContent = "failed to load the emulator: " + err;
+			});
+
+			async function boot(instance) {
+				runButton.disabled = false;
+				runButton.textContent = "Reboot";
+				state.textContent = "booting...";
+				await go.run(instance);
+				state.textContent = "the machine stopped";
+			}
+
+			// The guest keeps its file system in memory, so a reboot is simply
+			// a fresh instance of everything.
+			runButton.addEventListener("click", () => window.location.reload());
+		})();
 	</script>
-    <h1>WIP: tiny x86 emu</h1>
-    <p>This is a experimental x86 emulator.</p>
-	<button onClick="run();" id="runButton" disabled>Run</button>
-    <pre id="terminal"></pre>
 </body>
 
 </html>

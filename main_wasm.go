@@ -1,72 +1,125 @@
+//go:build wasm
 // +build wasm
 
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
+	_ "embed"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"time"
-	// "runtime"
+	"io"
 	"syscall/js"
+	"time"
 )
 
+//go:embed wasm/xv6.img.gz
+var xv6Image []byte
+
+//go:embed wasm/fs.img.gz
+var fsImage []byte
+
+// outBuf collects the guest output between two screen updates.
+var outBuf []byte
+
 func printf(format string, a ...interface{}) {
-	s := fmt.Sprintf(format, a...)
-	t := js.Global().Get("document").Call("getElementById", "terminal")
-	t.Call("insertAdjacentHTML", "beforeend", s)
-	t.Set("scrollTop", t.Get("scrollHeight"))
-	time.Sleep(5 * time.Millisecond)
+	outBuf = append(outBuf, []byte(fmt.Sprintf(format, a...))...)
 }
 
-type WasmWriter struct{}
+func flush() {
+	if len(outBuf) == 0 {
+		return
+	}
+	js.Global().Call("emuWrite", string(outBuf))
+	outBuf = outBuf[:0]
+}
 
-func (w WasmWriter) Write(p []byte) (n int, err error) {
-	printf("[foo]%v", p)
+// wasmWriter forwards everything the guest writes to the terminal.
+type wasmWriter struct{}
+
+func (w wasmWriter) Write(p []byte) (int, error) {
+	outBuf = append(outBuf, p...)
 	return len(p), nil
 }
 
+func gunzip(data []byte) []byte {
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		panic(err)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
+
 func main() {
-	printf("hello, world!!!!")
-	// runtime.LockOSThread()
-	f, err := Assets.Open("/xv6-public/xv6.img")
-	if err != nil {
-		panic(err)
-	}
-	bytes, err := ioutil.ReadAll(f)
-	if err != nil {
-		panic(err)
-	}
+	input := make(chan byte, 1024)
 
-	// setup emulator
-	writer := WasmWriter{}
-	e := NewEmulator(0x7c00+0x10240000, 0x7c00, 0x6f04, false, true, os.Stdin, writer, map[uint64]string{})
-	for i := 0; i < len(bytes); i++ {
-		e.memory[uint32(i+0x7c00)] = bytes[i]
-	}
-	e.io.hdds[0], _ = Assets.Open("/xv6-public/xv6.img")
-	f, err = Assets.Open("/xv6-public/xv6.img")
+	// The page calls emuKey() for every key the user presses.
+	js.Global().Set("emuKey", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		if len(args) == 0 {
+			return nil
+		}
+		for _, b := range []byte(args[0].String()) {
+			select {
+			case input <- b:
+			default:
+			}
+		}
+		return nil
+	}))
 
-	// emulate
-	i := 0
+	boot := gunzip(xv6Image)
+	fs := gunzip(fsImage)
+
+	e := NewEmulator(0x7c00, 0x7c00, false, wasmWriter{}, map[uint64]string{})
+	copy(e.memory[0x7c00:], boot[:SectorSize])
+	e.io.hdds[0] = NewMemDisk(boot)
+	e.io.hdds[1] = NewMemDisk(fs)
+
+	js.Global().Call("emuReady")
+
 	for {
-		// if !*silent && 0x8010376c < e.eip && e.eip < 0x801037d1 {
-		if false {
-			// if !*silent && i > 3635000 {
-			e.dump(i)
-		}
-		err := e.execInst()
-		if err != nil {
-			printf(err.Error())
-			os.Exit(1)
-		}
-
-		// exit in scheduler()
-		if e.eip == 0 || e.eip == 0x7c00 || e.eip == 0x80103bf0 {
+		// Feed the console with everything typed since the last round.
+		for {
+			select {
+			case b := <-input:
+				e.io.PushInput(b)
+				continue
+			default:
+			}
 			break
 		}
-		i++
+
+		// Run a batch of instructions, then hand control back to the
+		// browser so that the screen is updated and key events arrive.
+		batch := 200000
+		if e.halted {
+			// the guest is idle: one timer tick per round is enough
+			batch = 1
+		}
+		for i := 0; i < batch; i++ {
+			if err := e.execInst(); err != nil {
+				printf("\n%s\n", err.Error())
+				flush()
+				return
+			}
+			if e.shutdown {
+				printf("\nEnd of program\n")
+				flush()
+				return
+			}
+			if e.halted {
+				break
+			}
+		}
+		flush()
+		if e.halted {
+			time.Sleep(8 * time.Millisecond)
+		} else {
+			time.Sleep(time.Millisecond)
+		}
 	}
-	e.dump(i)
-	printf("End of program\n")
 }

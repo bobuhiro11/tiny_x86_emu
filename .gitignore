@@ -23,9 +23,11 @@ vendor/
 tags.lock
 tags
 
+# generated disk images embedded into the wasm build
+wasm/*.img.gz
+
 # other
 *.swp
 *.swo
 *.log
-assets.go
 httpserv
