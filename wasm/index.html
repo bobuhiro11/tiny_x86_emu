@@ -44,14 +44,32 @@
 		}
 
 		#screen {
+			position: relative;
 			background: var(--term-bg);
 			border: 1px solid #262b36;
 			border-radius: 6px;
 			padding: .75rem 1rem;
 			height: 60vh;
+			height: 60dvh;
 			min-height: 380px;
 			overflow: auto;
 			cursor: text;
+		}
+
+		/* Invisible; it exists only to hold the caret, because a phone shows
+		   its keyboard for a focused editable element and nothing else. The
+		   16px font size is what stops iOS from zooming in on focus. */
+		#kbd {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			border: 0;
+			outline: none;
+			opacity: 0;
+			resize: none;
+			font-size: 16px;
+			pointer-events: none;
 		}
 
 		#terminal {
@@ -128,12 +146,15 @@
 		<h1>tiny <span>x86</span> emu</h1>
 		<p class="lead">
 			An experimental x86 emulator written in Go, compiled to WebAssembly, booting
-			<a href="https://github.com/mit-pdos/xv6-public">xv6</a> from an emulated IDE disk.
-			Click the screen and type: try <code>ls</code>, <code>cat README</code>, <code>echo hi</code> or
+			<a href="https://github.com/mit-pdos/xv6-public">xv6</a> from an emulated IDE disk -
+			<a id="source" href="https://github.com/bobuhiro11/tiny_x86_emu">source on GitHub</a>.
+			Tap or click the screen and type: try <code>ls</code>, <code>cat README</code>, <code>echo hi</code> or
 			<code>forktest</code>.
 		</p>
 
-		<div id="screen"><pre id="terminal"></pre><span id="cursor"></span></div>
+		<div id="screen"><pre id="terminal"></pre><span id="cursor"></span><textarea id="kbd" rows="1"
+				autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"
+				aria-label="keyboard input"></textarea></div>
 
 		<div id="status">
 			<button id="runButton" disabled>Boot</button>
@@ -148,6 +169,7 @@
 			const screen = document.getElementById("screen");
 			const state = document.getElementById("state");
 			const runButton = document.getElementById("runButton");
+			const kbd = document.getElementById("kbd");
 
 			// The guest only writes plain text, backspace, carriage return and
 			// newline, so keeping the screen in a string is enough.
@@ -178,8 +200,14 @@
 			};
 
 			window.emuReady = function () {
-				state.textContent = "running - click the screen and type";
+				state.textContent = "running - tap the screen and type";
 			};
+
+			function send(s) {
+				if (s !== "" && window.emuKey) {
+					window.emuKey(s);
+				}
+			}
 
 			function keyToBytes(ev) {
 				if (ev.ctrlKey) {
@@ -198,15 +226,123 @@
 				}
 			}
 
+			// A phone has no hardware keyboard, and iOS only raises the on
+			// screen one for a focused editable element -- so the input sink
+			// is an invisible textarea that the screen focuses when tapped.
+			// Its keys arrive as input events rather than as keydown, so what
+			// the guest sees is the difference between the textarea's value
+			// and the padding kept in it. The padding is there so that a
+			// backspace always has something to delete: iOS reports no edit
+			// at all for a backspace in an already empty field.
+			const PAD = "        ";
+			let composing = false;
+			// what the guest has already been shown of the word an Android
+			// keyboard is still composing
+			let sent = "";
+
+			function resetPad() {
+				kbd.value = PAD;
+				try {
+					kbd.setSelectionRange(PAD.length, PAD.length);
+				} catch (e) { /* not every browser allows this while hidden */ }
+			}
+
+			// The text of the word being composed, i.e. everything the field
+			// holds beyond its padding.
+			function composed() {
+				const v = kbd.value;
+				return v.startsWith(PAD) ? v.slice(PAD.length) : v.replace(/^ +/, "");
+			}
+
+			// Android keyboards compose a whole word before committing it, and
+			// they rewrite it as they go. Forward the change rather than the
+			// word, so that characters appear as they are typed: backspace over
+			// what no longer matches, then send the rest.
+			function sendComposed(next) {
+				let same = 0;
+				while (same < sent.length && same < next.length && sent[same] === next[same]) {
+					same++;
+				}
+				send("\x7f".repeat(sent.length - same));
+				send(next.slice(same));
+				sent = next;
+			}
+
+			function drainKbd() {
+				const v = kbd.value;
+				if (v === PAD) {
+					return;
+				}
+				if (v.startsWith(PAD)) {
+					send(v.slice(PAD.length));
+				} else if (PAD.startsWith(v)) {
+					send("\x7f".repeat(PAD.length - v.length)); // padding eaten
+				} else {
+					// autocorrect or a paste replaced the padding wholesale
+					send(v.replace(/^ +/, ""));
+				}
+				resetPad();
+			}
+
+			kbd.addEventListener("input", function (ev) {
+				if (composing || ev.isComposing) {
+					sendComposed(composed()); // mid-word: do not touch the field
+				} else {
+					drainKbd();
+				}
+			});
+			kbd.addEventListener("compositionstart", () => {
+				composing = true;
+				sent = "";
+			});
+			kbd.addEventListener("compositionend", () => {
+				composing = false;
+				sendComposed(composed()); // the keyboard may have autocorrected it
+				sent = "";
+				resetPad();
+			});
+
 			document.addEventListener("keydown", function (ev) {
 				if (!window.emuKey || ev.metaKey || ev.altKey) {
 					return;
 				}
+				if (document.activeElement === kbd) {
+					// Printable keys, Enter and Backspace all edit the
+					// textarea and come back as input events; take only the
+					// keys that would never reach it.
+					let s = "";
+					if (ev.ctrlKey) {
+						s = keyToBytes(ev);
+					} else if (ev.key === "Tab") {
+						s = "\t";
+					} else if (ev.key === "Escape") {
+						s = "\x1b";
+					}
+					if (s !== "") {
+						ev.preventDefault();
+						send(s);
+					}
+					return;
+				}
+				// Nothing is focused (a desktop browser after a click in the
+				// margin): keep reading the hardware keyboard directly.
 				const s = keyToBytes(ev);
 				if (s !== "") {
 					ev.preventDefault();
-					window.emuKey(s);
+					send(s);
 				}
+			});
+
+			function grabKeyboard() {
+				resetPad();
+				kbd.focus();
+			}
+
+			screen.addEventListener("click", function () {
+				if (window.getSelection().toString() !== "") {
+					return; // the tap was selecting output, not asking to type
+				}
+				grabKeyboard();
 			});
 
 			if (!WebAssembly.instantiateStreaming) { // polyfill
@@ -228,6 +364,7 @@
 				runButton.disabled = false;
 				runButton.textContent = "Reboot";
 				state.textContent = "booting...";
+				grabKeyboard();
 				await go.run(instance);
 				state.textContent = "the machine stopped";
 			}
