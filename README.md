@@ -1,4 +1,4 @@
-# tiny_x86_emu [![wercker status](https://app.wercker.com/status/7ac504b68746c744dd7dc4b5e52e4735/s/master "wercker status")](https://app.wercker.com/project/byKey/7ac504b68746c744dd7dc4b5e52e4735) [![GoDoc](https://godoc.org/github.com/nmi/tiny_x86_emu?status.svg)](https://godoc.org/github.com/nmi/tiny_x86_emu) [![Go Report Card](https://goreportcard.com/badge/github.com/nmi/tiny_x86_emu)](https://goreportcard.com/report/github.com/nmi/tiny_x86_emu) ![](https://img.shields.io/github/license/nmi/tiny_x86_emu.svg)
+# tiny_x86_emu [![CI](https://github.com/bobuhiro11/tiny_x86_emu/actions/workflows/ci.yml/badge.svg)](https://github.com/bobuhiro11/tiny_x86_emu/actions/workflows/ci.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/bobuhiro11/tiny_x86_emu.svg)](https://pkg.go.dev/github.com/bobuhiro11/tiny_x86_emu) [![Go Report Card](https://goreportcard.com/badge/github.com/bobuhiro11/tiny_x86_emu)](https://goreportcard.com/report/github.com/bobuhiro11/tiny_x86_emu) ![](https://img.shields.io/github/license/bobuhiro11/tiny_x86_emu.svg)
 
 This is an experimental x86 emulator written in Go. It boots
 [xv6](https://github.com/mit-pdos/xv6-public) from an emulated IDE disk, all the
@@ -18,7 +18,7 @@ $ echo hello
 $ forktest
 ```
 
-![screenshot](https://raw.githubusercontent.com/nmi/tiny_x86_emu/master/screenshot.png)
+![screenshot](https://raw.githubusercontent.com/bobuhiro11/tiny_x86_emu/master/screenshot.png)
 
 ## What is emulated
 
