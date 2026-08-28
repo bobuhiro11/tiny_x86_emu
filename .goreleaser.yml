@@ -1,6 +1,7 @@
+version: 2
 builds:
   - binary: tiny_x86_emu
-    main: tiny_x86_emu/main.go
+    main: .
     goos:
       - darwin
       - windows

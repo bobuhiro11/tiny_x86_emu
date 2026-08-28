@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        go-version: ['1.25.x', '1.24.x']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y nasm gcc binutils make
+
+    - name: Display system information
+      run: |
+        go version
+        uname -a
+        gcc --version | head -n 1
+        ld --version | head -n 1
+        objdump --version | head -n 1
+        nasm -v
+        ndisasm -v
+
+    - name: Run tests
+      env:
+        GOFLAGS: "-buildvcs=false"
+      run: make test
+
+    # Booting xv6 all the way through its own test suite takes a few minutes,
+    # so the test itself is gated behind USERTESTS.
+    - name: Run the xv6 user test suite
+      env:
+        GOFLAGS: "-buildvcs=false"
+        USERTESTS: "1"
+      run: go test -run TestXv6Usertests -timeout 30m -v .
+
+    - name: Build the emulator, the wasm binary and the http server
+      env:
+        GOFLAGS: "-buildvcs=false"
+      run: make all
+
+    - name: Clean up
+      if: always()
+      run: make clean
+
+  deploy:
+    runs-on: ubuntu-22.04
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.x'
+
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v5
+      with:
+        version: latest
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
