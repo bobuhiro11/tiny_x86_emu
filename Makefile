@@ -21,9 +21,19 @@ all: tiny_x86_emu wasm/tiny_x86_emu.wasm httpserv
 test: $(GUEST_BINARIES) xv6-public/xv6.img xv6-public/fs.img
 	go vet $(PKGS) && go test $(PKGS) -v --cover -timeout 30m
 
+# The Linux guest is not part of "make all": building a kernel takes a few
+# minutes and needs the sources, so it is opt in. The tests which boot Linux
+# skip themselves while the images are missing.
+.PHONY: linux
+linux: linux/bzImage linux/initramfs.cpio
+
+linux/bzImage linux/initramfs.cpio: linux/tiny_x86_emu.config script/build-linux.sh
+	./script/build-linux.sh
+
 .PHONY: clean
 clean:
 	make --quiet -C xv6-public/ clean
+	rm -f linux/bzImage linux/initramfs.cpio
 	rm -f tiny_x86_emu wasm/tiny_x86_emu.wasm wasm/wasm_exec.js \
 		wasm/xv6.img.gz wasm/fs.img.gz httpserv guest/*.bin guest/*.o
 	go clean

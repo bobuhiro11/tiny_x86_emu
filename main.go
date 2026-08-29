@@ -65,44 +65,80 @@ func rawMode() func() {
 	}
 }
 
+// bootLinux loads a bzImage and its initial ram disk into a fresh machine.
+func bootLinux(bzImagePath, initrdPath, cmdline string,
+	disasm map[uint64]string) (*Emulator, error) {
+	bzImage, err := os.ReadFile(bzImagePath)
+	if err != nil {
+		return nil, err
+	}
+	var initrd []byte
+	if initrdPath != "" {
+		if initrd, err = os.ReadFile(initrdPath); err != nil {
+			return nil, err
+		}
+	}
+	e := NewEmulator(0, 0, false, os.Stdout, disasm)
+	if err := LoadLinux(e, bzImage, initrd, cmdline); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// bootDiskImage loads the boot sector of a disk image, the way a BIOS would.
+func bootDiskImage(filename, fsname string,
+	disasm map[uint64]string) (*Emulator, error) {
+	boot, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// The BIOS loads the first sector of the boot disk at 0x7c00 and jumps
+	// to it. Everything else is read by the guest through the IDE ports.
+	e := NewEmulator(0x7c00, 0x7c00, false, os.Stdout, disasm)
+	bootSector := make([]byte, SectorSize)
+	if _, err := boot.ReadAt(bootSector, 0); err != nil {
+		return nil, err
+	}
+	copy(e.memory[0x7c00:], bootSector)
+
+	e.io.hdds[0] = NewDisk(boot)
+	if fs, err := os.OpenFile(fsname, os.O_RDWR, 0); err == nil {
+		e.io.hdds[1] = NewDisk(fs)
+	} else {
+		fmt.Fprintf(os.Stderr, "warning: %s is not available: %v\n", fsname, err)
+	}
+	return e, nil
+}
+
 func main() {
 	filename := flag.String("f", "xv6-public/xv6.img", "boot disk image")
 	fsname := flag.String("fs", "xv6-public/fs.img", "file system disk image")
 	kernel := flag.String("kernel", "xv6-public/kernel", "kernel binary used for the trace")
+	bzImage := flag.String("bzImage", "", "Linux kernel image to boot instead of the disk")
+	initrd := flag.String("initrd", "", "initial ram disk of the Linux kernel")
+	cmdline := flag.String("cmdline", DefaultCmdline, "Linux kernel command line")
 	trace := flag.Bool("trace", false, "dump every executed instruction")
 	maxInst := flag.Uint64("max", 0, "stop after this many instructions (0: no limit)")
 	flag.Parse()
-
-	boot, err := os.Open(*filename)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-	defer boot.Close()
 
 	disasm := map[uint64]string{}
 	if *trace {
 		disasm = loadSymbols(*kernel)
 	}
 
-	// The BIOS loads the first sector of the boot disk at 0x7c00 and jumps
-	// to it. Everything else is read by the guest through the IDE ports.
-	e := NewEmulator(0x7c00, 0x7c00, false, os.Stdout, disasm)
-	e.trace = *trace
-	bootSector := make([]byte, SectorSize)
-	if _, err := boot.ReadAt(bootSector, 0); err != nil {
+	var e *Emulator
+	var err error
+	if *bzImage != "" {
+		e, err = bootLinux(*bzImage, *initrd, *cmdline, disasm)
+	} else {
+		e, err = bootDiskImage(*filename, *fsname, disasm)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	copy(e.memory[0x7c00:], bootSector)
-
-	e.io.hdds[0] = NewDisk(boot)
-	if fs, err := os.OpenFile(*fsname, os.O_RDWR, 0); err == nil {
-		defer fs.Close()
-		e.io.hdds[1] = NewDisk(fs)
-	} else {
-		fmt.Fprintf(os.Stderr, "warning: %s is not available: %v\n", *fsname, err)
-	}
+	e.trace = *trace
 
 	restore := rawMode()
 	defer restore()
@@ -123,11 +159,23 @@ func main() {
 		}
 	}()
 
+	started := time.Now()
 	for {
 		if e.halted {
-			// the guest is waiting for an interrupt: give the host cpu a
-			// break, one timer tick is delivered per round
-			time.Sleep(2 * time.Millisecond)
+			// The guest is waiting for an interrupt and the emulator is
+			// free to skip ahead to the next timer deadline. Only sleep
+			// when the guest is ahead of the wall clock, which is what
+			// happens when it sits idle at a shell prompt: while it is
+			// busy the emulator is slower than the machine it emulates
+			// anyway.
+			virtual := time.Duration(float64(e.instCount) /
+				cpuFrequency * float64(time.Second))
+			if ahead := virtual - time.Since(started); ahead > 0 {
+				if ahead > 5*time.Millisecond {
+					ahead = 5 * time.Millisecond
+				}
+				time.Sleep(ahead)
+			}
 		}
 		if e.instCount&0xFFF == 0 || e.halted {
 			select {

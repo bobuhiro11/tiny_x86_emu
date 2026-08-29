@@ -26,6 +26,12 @@ tags
 # generated disk images embedded into the wasm build
 wasm/*.img.gz
 
+# the Linux guest: sources and images built by script/build-linux.sh
+linux/src/
+linux/u-root/
+linux/bzImage
+linux/initramfs.cpio
+
 # other
 *.swp
 *.swo
