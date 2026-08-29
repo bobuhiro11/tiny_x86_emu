@@ -60,8 +60,7 @@ const (
 // DefaultCmdline is the command line the emulator boots Linux with: the
 // console is the serial port, and the userland comes from the initial ram
 // disk.
-const DefaultCmdline = "console=ttyS0 earlyprintk=serial,ttyS0 " +
-	"panic=-1 no_timer_check tsc=reliable"
+const DefaultCmdline = "console=ttyS0 earlyprintk=serial,ttyS0 tsc=reliable"
 
 // e820 memory types
 const (
