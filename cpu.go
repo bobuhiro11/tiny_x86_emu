@@ -158,6 +158,7 @@ type Emulator struct {
 	codeTag  uint32 // page number of the cached instruction page + 1 (0 = invalid)
 	codePhys uint32 // physical base address of the cached instruction page
 
+	fpu       x87State  // the (barely emulated) floating point unit
 	instCount uint64    // number of executed instructions
 	writer    io.Writer // the console of the guest
 	trace     bool
@@ -626,16 +627,20 @@ func (e *Emulator) fetchImm(size int) uint32 {
 // stack
 // ---------------------------------------------------------------------------
 
+// push writes the value below the current stack pointer. The stack pointer is
+// only updated once the write went through: growing the stack of a user
+// process faults on the first push into a new page, and the instruction is
+// restarted afterwards.
 func (e *Emulator) push(value uint32, size int) {
 	if e.stackAddressSize() == 16 {
-		sp := (e.getRegister16(SP) - uint16(size/8))
-		e.setRegister16(SP, sp)
+		sp := e.getRegister16(SP) - uint16(size/8)
 		e.writeSeg(SS, uint32(sp), size, value)
+		e.setRegister16(SP, sp)
 		return
 	}
 	esp := e.registers[ESP] - uint32(size/8)
-	e.registers[ESP] = esp
 	e.writeSeg(SS, esp, size, value)
+	e.registers[ESP] = esp
 }
 
 func (e *Emulator) pop(size int) uint32 {

@@ -97,6 +97,9 @@ type IO struct {
 	lapic lapicState
 	ioapi ioapicState
 	crt   crtState
+	pic   picState
+	pit   pitState
+	cmos  cmosState
 
 	// putc receives every byte the guest writes to the serial port.
 	putc func(byte)
@@ -105,6 +108,8 @@ type IO struct {
 // NewIO creates the device model of the machine.
 func NewIO(e *Emulator, out func(byte)) *IO {
 	io := &IO{e: e, putc: out}
+	io.pic.reset()
+	io.pit = newPIT()
 	io.ide.status = ideDRDY
 	io.lapic.regs[lapicVER] = 0x00050014
 	io.ioapi.regs[0] = 0
@@ -117,7 +122,7 @@ func NewIO(e *Emulator, out func(byte)) *IO {
 // PushInput queues one byte of console input for the guest.
 func (io *IO) PushInput(b byte) {
 	io.uart.rx = append(io.uart.rx, b)
-	if io.uart.ier&0x01 != 0 {
+	if io.uart.ier&uartIERRX != 0 {
 		io.raiseIRQ(irqCom1)
 	}
 }
@@ -125,8 +130,11 @@ func (io *IO) PushInput(b byte) {
 // HasInput reports whether console input is still waiting to be read.
 func (io *IO) HasInput() bool { return len(io.uart.rx) > 0 }
 
-// raiseIRQ routes a device interrupt through the I/O APIC.
+// raiseIRQ asserts a device interrupt line. It reaches the cpu either through
+// the 8259 interrupt controllers (Linux) or through the I/O APIC (xv6), the
+// guest decides by masking the one it does not use.
 func (io *IO) raiseIRQ(irq int) {
+	io.pic.raise(irq)
 	entry := io.ioapi.redir[irq]
 	if entry&0x00010000 != 0 {
 		return // masked
@@ -137,13 +145,17 @@ func (io *IO) raiseIRQ(irq int) {
 // step advances the timers and the devices. It is called regularly from the
 // instruction loop.
 func (io *IO) step(instCount uint64) {
+	if io.pit.step(pitTick(instCount)) {
+		io.raiseIRQ(irqTimer)
+	}
 	if io.lapic.timerEnabled() && instCount-io.lapic.lastTick >= timerPeriod {
 		io.lapic.lastTick = instCount
 		io.e.raiseIRQ(int(io.lapic.regs[lapicTIMER] & 0xFF))
 	}
 	// the uart interrupt is level triggered: as long as unread data sits in
-	// the receive buffer the line stays asserted
-	if len(io.uart.rx) > 0 && io.uart.ier&0x01 != 0 {
+	// the receive buffer (or the guest wants transmitter interrupts) the
+	// line stays asserted
+	if io.uart.uartIRQ() {
 		io.raiseIRQ(irqCom1)
 	}
 	if io.ide.irqCountdown > 0 {
@@ -157,11 +169,14 @@ func (io *IO) step(instCount uint64) {
 // idle fast forwards to the next timer deadline. It is called while the cpu
 // is halted waiting for an interrupt.
 func (io *IO) idle() {
+	next := io.pit.deadline()
 	if io.lapic.timerEnabled() {
-		next := io.lapic.lastTick + timerPeriod
-		if next > io.e.instCount {
-			io.e.instCount = next
+		if t := io.lapic.lastTick + timerPeriod; next == 0 || t < next {
+			next = t
 		}
+	}
+	if next > io.e.instCount {
+		io.e.instCount = next
 	} else {
 		io.e.instCount += 256
 	}
@@ -218,10 +233,16 @@ func (io *IO) in8(port uint16) uint8 {
 		return 0x14
 	case port == 0x03D4 || port == 0x03D5:
 		return io.crtIn(port)
-	case port == 0x0071: // CMOS data
-		return 0
-	case port == 0x0020 || port == 0x00A0: // 8259 PIC
-		return 0
+	case port == 0x0070 || port == 0x0071:
+		return io.cmos.in(port)
+	case port >= 0x0040 && port <= 0x0043:
+		return io.pit.in(port, pitTick(io.e.instCount))
+	case port == 0x0061:
+		return io.pit.speakerIn(pitTick(io.e.instCount))
+	case port == 0x0020 || port == 0x0021 || port == 0x00A0 || port == 0x00A1:
+		return io.pic.in(port)
+	case port == 0x0092: // the A20 gate is always open
+		return 0x02
 	}
 	return 0xFF
 }
@@ -234,8 +255,26 @@ func (io *IO) out8(port uint16, value uint8) {
 		io.uartOut(port, value)
 	case port == 0x03D4 || port == 0x03D5:
 		io.crtOut(port, value)
+	case port == 0x0070 || port == 0x0071:
+		io.cmos.out(port, value)
+	case port >= 0x0040 && port <= 0x0043:
+		io.pit.out(port, value, pitTick(io.e.instCount))
+	case port == 0x0061:
+		io.pit.speakerOut(value, pitTick(io.e.instCount))
+	case port == 0x0020 || port == 0x0021 || port == 0x00A0 || port == 0x00A1:
+		io.pic.out(port, value)
+	case port == 0x0064: // keyboard controller command
+		if value == 0xFE {
+			// the classic way of resetting a PC: the emulator stops
+			// instead of starting the machine over
+			io.e.shutdown = true
+		}
+	case port == 0x0CF9: // PCI reset control
+		if value&0x04 != 0 {
+			io.e.shutdown = true
+		}
 	}
-	// everything else (PIC, PIT, CMOS, keyboard controller, ...) is ignored
+	// everything else (the POST port, the keyboard controller, ...) is ignored
 }
 
 // ---------------------------------------------------------------------------
@@ -374,13 +413,27 @@ func (io *IO) ideReadSector() {
 // ---------------------------------------------------------------------------
 
 type uartState struct {
-	rx   []byte
-	ier  uint8
-	lcr  uint8
-	mcr  uint8
-	dll  uint8
-	dlm  uint8
-	fifo uint8
+	rx  []byte
+	ier uint8
+	lcr uint8
+	mcr uint8
+	dll uint8
+	dlm uint8
+	fcr uint8
+	scr uint8
+}
+
+const (
+	uartIERRX   = 0x01 // interrupt when a character was received
+	uartIERTHRE = 0x02 // interrupt when the transmitter is idle
+	uartMCRLOOP = 0x10 // loopback mode, used by the driver to probe the port
+)
+
+// uartIRQ reports whether the uart is asserting its interrupt line. The
+// transmitter is never busy, so a guest which asks for transmitter interrupts
+// gets one on every check.
+func (s *uartState) uartIRQ() bool {
+	return (s.ier&uartIERRX != 0 && len(s.rx) > 0) || s.ier&uartIERTHRE != 0
 }
 
 func (io *IO) uartIn(port uint16) uint8 {
@@ -396,7 +449,7 @@ func (io *IO) uartIn(port uint16) uint8 {
 		}
 		b := s.rx[0]
 		s.rx = s.rx[1:]
-		if len(s.rx) > 0 && s.ier&0x01 != 0 {
+		if len(s.rx) > 0 && s.ier&uartIERRX != 0 {
 			io.raiseIRQ(irqCom1)
 		}
 		return b
@@ -405,23 +458,39 @@ func (io *IO) uartIn(port uint16) uint8 {
 			return s.dlm
 		}
 		return s.ier
-	case 2: // interrupt identification
-		if len(s.rx) > 0 {
-			return 0x04 // received data available
+	case 2: // interrupt identification and fifo status
+		var iir uint8
+		switch {
+		case s.ier&uartIERRX != 0 && len(s.rx) > 0:
+			iir = 0x04 // received data available
+		case s.ier&uartIERTHRE != 0:
+			iir = 0x02 // transmitter holding register empty
+		default:
+			iir = 0x01 // no interrupt pending
 		}
-		return 0x01 // no interrupt pending
+		if s.fcr&0x01 != 0 {
+			iir |= 0xC0 // the fifos of a 16550A are enabled
+		}
+		return iir
 	case 3:
 		return s.lcr
 	case 4:
 		return s.mcr
-	case 5: // line status: transmitter always ready
+	case 5: // line status: the transmitter is always ready
 		lsr := uint8(0x60)
 		if len(s.rx) > 0 {
 			lsr |= 0x01
 		}
 		return lsr
 	case 6: // modem status
+		if s.mcr&uartMCRLOOP != 0 {
+			// in loopback mode the modem control outputs are wired to
+			// the modem status inputs
+			return (s.mcr&0x01)<<5 | (s.mcr&0x02)<<3 | (s.mcr&0x0C)<<4
+		}
 		return 0xB0
+	case 7:
+		return s.scr
 	}
 	return 0
 }
@@ -435,6 +504,10 @@ func (io *IO) uartOut(port uint16, value uint8) {
 			s.dll = value
 			return
 		}
+		if s.mcr&uartMCRLOOP != 0 {
+			s.rx = append(s.rx, value)
+			break
+		}
 		if io.putc != nil {
 			io.putc(value)
 		}
@@ -442,17 +515,22 @@ func (io *IO) uartOut(port uint16, value uint8) {
 		if dlab {
 			s.dlm = value
 		} else {
-			s.ier = value
-			if s.ier&0x01 != 0 && len(s.rx) > 0 {
-				io.raiseIRQ(irqCom1)
-			}
+			s.ier = value & 0x0F
 		}
 	case 2:
-		s.fifo = value
+		s.fcr = value
+		if value&0x02 != 0 {
+			s.rx = nil
+		}
 	case 3:
 		s.lcr = value
 	case 4:
 		s.mcr = value
+	case 7:
+		s.scr = value
+	}
+	if s.uartIRQ() {
+		io.raiseIRQ(irqCom1)
 	}
 }
 

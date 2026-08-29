@@ -322,8 +322,11 @@ func (e *Emulator) execute(op uint8) {
 		}
 		e.loadSegment(int(m.reg), uint16(e.readRM(m, 16)))
 	case op == 0x8F: // pop rm
+		// the effective address is computed with the already popped
+		// stack pointer, which matters for "pop n(%esp)"
+		v := e.pop(size)
 		m := e.parseModRM()
-		e.writeRM(m, size, e.pop(size))
+		e.writeRM(m, size, v)
 
 	case op == 0x90: // nop
 	case op >= 0x91 && op <= 0x97: // xchg eax, r
@@ -513,8 +516,8 @@ func (e *Emulator) execute(op uint8) {
 		off := e.getReg(EBX, e.addrSize) + uint32(e.getRegister8(AL))
 		e.setRegister8(AL, uint8(e.readSeg(e.dataSeg(DS), off, 8)))
 
-	case op >= 0xD8 && op <= 0xDF: // x87 escape: not supported
-		e.parseModRM()
+	case op >= 0xD8 && op <= 0xDF: // x87 escape
+		e.executeX87(op)
 
 	case op >= 0xE0 && op <= 0xE2: // loopne/loope/loop
 		rel := signExtend(uint32(e.fetch8()), 8)
@@ -739,6 +742,22 @@ func (e *Emulator) execute0F(op uint8) {
 			abort("0f 01 /%d is not implemented", m.reg)
 		}
 
+	case op == 0x0D, op >= 0x18 && op <= 0x1F: // prefetch and multi byte nop
+		e.parseModRM()
+	case op == 0x6E, op == 0x6F, op == 0x7E, op == 0x7F, op == 0x77:
+		e.executeMMX(op)
+	case op == 0xAE: // fences and the cache management instructions
+		m := e.parseModRM()
+		if m.isMem && m.reg < 2 {
+			abort("fxsave/fxrstor is not implemented")
+		}
+	case op == 0xC7: // group 9
+		m := e.parseModRM()
+		if m.reg != 1 || !m.isMem {
+			abort("0f c7 /%d is not implemented", m.reg)
+		}
+		e.cmpxchg8b(m)
+
 	case op == 0x06: // clts
 		e.cr[0] &^= 0x8
 	case op == 0x08, op == 0x09: // invd / wbinvd
@@ -895,8 +914,11 @@ func (e *Emulator) execute0F(op uint8) {
 		m := e.parseModRM()
 		a := e.readRM(m, opsz)
 		b := e.getReg(m.reg, opsz)
-		e.setReg(m.reg, opsz, a)
+		// the memory operand is written first: if that faults the
+		// instruction is restarted, and it has to see its own operands
+		// again
 		e.writeRM(m, opsz, e.updateFlagsAdd(opsz, a, b, 0))
+		e.setReg(m.reg, opsz, a)
 
 	case op >= 0xC8 && op <= 0xCF: // bswap
 		i := op - 0xC8
@@ -974,21 +996,48 @@ func (e *Emulator) doubleShift(m ModRM, size int, count uint32, left bool) {
 func (e *Emulator) cpuid() {
 	switch e.registers[EAX] {
 	case 0:
-		e.registers[EAX] = 1
+		e.registers[EAX] = 1          // no leaf beyond the feature bits
 		e.registers[EBX] = 0x756E6547 // "Genu"
 		e.registers[EDX] = 0x49656E69 // "ineI"
 		e.registers[ECX] = 0x6C65746E // "ntel"
 	case 1:
-		e.registers[EAX] = 0x00000480 // family 4, model 8
+		// a Pentium Pro: family 6, model 1, stepping 3
+		e.registers[EAX] = 0x00000613
 		e.registers[EBX] = 0
 		e.registers[ECX] = 0
-		e.registers[EDX] = 0x00000011 // FPU, TSC... keep it minimal
+		e.registers[EDX] = cpuidFeatures
 	default:
 		e.registers[EAX] = 0
 		e.registers[EBX] = 0
 		e.registers[ECX] = 0
 		e.registers[EDX] = 0
 	}
+}
+
+// the feature bits of leaf 1: everything the emulator really implements and
+// nothing else, so that the guest does not try to use SSE or the local APIC
+const cpuidFeatures = 1<<0 | // FPU
+	1<<3 | // PSE: 4MB pages
+	1<<4 | // TSC
+	1<<8 | // CMPXCHG8B
+	1<<13 | // PGE: global pages
+	1<<15 | // CMOV
+	1<<23 // MMX (only the 64bit moves, which is what Go needs)
+
+// cmpxchg8b compares EDX:EAX with a 64bit memory operand and replaces it with
+// ECX:EBX when they are equal.
+func (e *Emulator) cmpxchg8b(m ModRM) {
+	lo := e.readSeg(m.seg, m.addr, 32)
+	hi := e.readSeg(m.seg, m.addr+4, 32)
+	if lo == e.registers[EAX] && hi == e.registers[EDX] {
+		e.eflags.set(ZeroFlag)
+		e.writeSeg(m.seg, m.addr, 32, e.registers[EBX])
+		e.writeSeg(m.seg, m.addr+4, 32, e.registers[ECX])
+		return
+	}
+	e.eflags.unset(ZeroFlag)
+	e.registers[EAX] = lo
+	e.registers[EDX] = hi
 }
 
 func (e *Emulator) setCR(index int, value uint32) {

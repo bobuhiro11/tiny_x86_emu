@@ -17,7 +17,8 @@ const (
 	IOAPICBase = uint32(0xFEC00000)
 
 	// PHYSTOP is the size of the physical memory of the machine. It has to
-	// match the PHYSTOP of the guest (see xv6-public/memlayout.h).
+	// match the PHYSTOP of the guest (see xv6-public/memlayout.h); the
+	// Linux guest learns about it from the e820 map instead.
 	PHYSTOP = uint32(0xE000000)
 
 	// DEVSPACE is the start of the memory mapped devices.

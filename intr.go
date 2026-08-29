@@ -146,12 +146,15 @@ func (e *Emulator) raiseIRQ(vector int) {
 }
 
 func (e *Emulator) checkInterrupts() error {
-	if e.numIRR == 0 || !e.eflags.isEnable(InterruptFlag) {
+	if !e.eflags.isEnable(InterruptFlag) {
 		return nil
 	}
 	if e.intAfter > 0 {
 		e.intAfter--
 		return nil
+	}
+	if e.numIRR == 0 {
+		return e.checkPIC()
 	}
 	for v := 0; v < 256; v++ {
 		if !e.irr[v] {
@@ -164,6 +167,18 @@ func (e *Emulator) checkInterrupts() error {
 		return e.deliver(cpuException{vector: v})
 	}
 	return nil
+}
+
+// checkPIC delivers the interrupt the 8259 controllers are asking for.
+func (e *Emulator) checkPIC() error {
+	vector := e.io.pic.pending()
+	if vector < 0 {
+		return nil
+	}
+	e.io.pic.acknowledge(vector)
+	e.halted = false
+	e.instEIP = e.eip
+	return e.deliver(cpuException{vector: vector})
 }
 
 // biosInterrupt emulates the few BIOS services the boot sector of the test
