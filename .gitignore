@@ -23,8 +23,10 @@ vendor/
 tags.lock
 tags
 
-# generated disk images embedded into the wasm build
+# generated disk images embedded into or fetched by the wasm build
 wasm/*.img.gz
+wasm/bzImage.gz
+wasm/initramfs.cpio.gz
 
 # the Linux guest: sources and images built by script/build-linux.sh
 linux/src/

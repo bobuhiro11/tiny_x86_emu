@@ -35,7 +35,8 @@ clean:
 	make --quiet -C xv6-public/ clean
 	rm -f linux/bzImage linux/initramfs.cpio
 	rm -f tiny_x86_emu wasm/tiny_x86_emu.wasm wasm/wasm_exec.js \
-		wasm/xv6.img.gz wasm/fs.img.gz httpserv guest/*.bin guest/*.o
+		wasm/xv6.img.gz wasm/fs.img.gz wasm/bzImage.gz \
+		wasm/initramfs.cpio.gz httpserv guest/*.bin guest/*.o
 	go clean
 
 .PHONY: xv6-public/xv6.img
@@ -64,6 +65,17 @@ wasm/wasm_exec.js:
 
 wasm/tiny_x86_emu.wasm: $(SRCS) wasm/xv6.img.gz wasm/fs.img.gz wasm/wasm_exec.js
 	GOOS=js GOARCH=wasm go build $(GO_BUILD_OPT) -o $@
+
+# The Linux images are far too big to embed, so the page downloads them from
+# next to the wasm binary when the guest is switched to Linux.
+.PHONY: wasm-linux
+wasm-linux: wasm/bzImage.gz wasm/initramfs.cpio.gz
+
+wasm/bzImage.gz: linux/bzImage
+	gzip -9 -c $< > $@
+
+wasm/initramfs.cpio.gz: linux/initramfs.cpio
+	gzip -9 -c $< > $@
 
 httpserv: script/httpserv.go
 	go build -o httpserv ./script/httpserv.go

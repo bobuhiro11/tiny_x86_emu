@@ -20,6 +20,11 @@ $ echo hello
 $ forktest
 ```
 
+The guest can be switched between xv6 and Linux with the drop down below the
+terminal (or with `?guest=linux`). The Linux images are downloaded next to the
+wasm binary instead of being built into it, so the page only fetches the six
+megabytes of kernel and initramfs when Linux is actually asked for.
+
 ![screenshot](https://raw.githubusercontent.com/bobuhiro11/tiny_x86_emu/master/screenshot.png)
 
 ## What is emulated
@@ -146,6 +151,20 @@ $ shutdown -r
 `LINUX_TAG=v6.12 make linux` builds a different version of the kernel, and
 `LINUX_SRC` and `UROOT_SRC` point the build at trees which are already on the
 disk.
+
+The browser boots the same guest. `make wasm-linux` compresses the two images
+next to the wasm binary, and `?guest=linux` (or the drop down below the
+terminal) asks the page for them:
+
+```bash
+$ make linux wasm-linux all
+$ ./httpserv
+# then open http://localhost:8000/?guest=linux
+```
+
+It takes about 25 seconds there, including the download.
+
+![Linux booted in the browser](screenshot-linux.png)
 
 ## Testing
 

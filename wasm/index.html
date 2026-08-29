@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>tiny x86 emu - xv6 in your browser</title>
+	<title>tiny x86 emu - xv6 and Linux in your browser</title>
 	<style>
 		:root {
 			--bg: #12141a;
@@ -146,10 +146,13 @@
 		<h1>tiny <span>x86</span> emu</h1>
 		<p class="lead">
 			An experimental x86 emulator written in Go, compiled to WebAssembly, booting
-			<a href="https://github.com/mit-pdos/xv6-public">xv6</a> from an emulated IDE disk -
+			<a href="https://github.com/mit-pdos/xv6-public">xv6</a> from an emulated IDE disk or
+			<a href="https://kernel.org">Linux</a> with
+			<a href="https://github.com/u-root/u-root">u-root</a> as its userland -
 			<a id="source" href="https://github.com/bobuhiro11/tiny_x86_emu">source on GitHub</a>.
-			Tap or click the screen and type: try <code>ls</code>, <code>cat README</code>, <code>echo hi</code> or
-			<code>forktest</code>.
+			Tap or click the screen and type: <code>ls</code>, <code>echo hi</code> and
+			<code>cat README</code> work on xv6, <code>ls /</code>, <code>free</code> and
+			<code>cat /proc/version</code> on Linux.
 		</p>
 
 		<div id="screen"><pre id="terminal"></pre><span id="cursor"></span><textarea id="kbd" rows="1"
@@ -158,6 +161,11 @@
 
 		<div id="status">
 			<button id="runButton" disabled>Boot</button>
+			<label for="guest">guest</label>
+			<select id="guest">
+				<option value="xv6">xv6</option>
+				<option value="linux">Linux + u-root</option>
+			</select>
 			<span id="state">loading emulator...</span>
 		</div>
 	</main>
@@ -169,7 +177,17 @@
 			const screen = document.getElementById("screen");
 			const state = document.getElementById("state");
 			const runButton = document.getElementById("runButton");
+			const guest = document.getElementById("guest");
 			const kbd = document.getElementById("kbd");
+
+			// ?guest=linux boots the Linux images instead of xv6. They are
+			// several megabytes, so they are fetched on demand rather than
+			// built into the wasm binary.
+			const wantLinux = new URLSearchParams(location.search).get("guest") === "linux";
+			guest.value = wantLinux ? "linux" : "xv6";
+			guest.addEventListener("change", () => {
+				location.search = guest.value === "linux" ? "?guest=linux" : "";
+			});
 
 			// The guest only writes plain text, backspace, carriage return and
 			// newline, so keeping the screen in a string is enough.
@@ -354,11 +372,39 @@
 
 			const go = new Go();
 
-			WebAssembly.instantiateStreaming(fetch("tiny_x86_emu.wasm"), go.importObject).then((result) => {
-				boot(result.instance);
-			}).catch((err) => {
-				state.textContent = "failed to load the emulator: " + err;
-			});
+			async function fetchImage(name) {
+				const resp = await fetch(name);
+				if (!resp.ok) {
+					throw new Error(name + ": " + resp.status + " " + resp.statusText);
+				}
+				return new Uint8Array(await resp.arrayBuffer());
+			}
+
+			async function loadLinuxImages() {
+				state.textContent = "downloading the Linux images...";
+				const [kernel, initrd] = await Promise.all([
+					fetchImage("bzImage.gz"),
+					fetchImage("initramfs.cpio.gz"),
+				]);
+				window.emuImages = { kernel, initrd };
+			}
+
+			(async function () {
+				let instance;
+				try {
+					const result = await WebAssembly.instantiateStreaming(
+						fetch("tiny_x86_emu.wasm"), go.importObject);
+					instance = result.instance;
+					if (wantLinux) {
+						await loadLinuxImages();
+					}
+				} catch (err) {
+					state.textContent = "failed to start: " + err +
+						(wantLinux ? " (run make wasm-linux to build the Linux images)" : "");
+					return;
+				}
+				boot(instance);
+			})();
 
 			async function boot(instance) {
 				runButton.disabled = false;

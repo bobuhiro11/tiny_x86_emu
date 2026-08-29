@@ -42,6 +42,41 @@ func (w wasmWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// jsBytes copies a Uint8Array which the page fetched into the go heap.
+func jsBytes(v js.Value) []byte {
+	if !v.Truthy() {
+		return nil
+	}
+	buf := make([]byte, v.Get("length").Int())
+	js.CopyBytesToGo(buf, v)
+	return buf
+}
+
+// newGuest builds the machine the page asked for. The page fetches the images
+// of the Linux guest (they are far too big to embed) and leaves them in
+// window.emuImages; without them the emulator boots the xv6 images which are
+// part of the binary.
+func newGuest() (*Emulator, error) {
+	images := js.Global().Get("emuImages")
+	if images.Truthy() {
+		kernel := gunzip(jsBytes(images.Get("kernel")))
+		initrd := gunzip(jsBytes(images.Get("initrd")))
+		e := NewEmulator(0, 0, false, wasmWriter{}, map[uint64]string{})
+		if err := LoadLinux(e, kernel, initrd, DefaultCmdline); err != nil {
+			return nil, err
+		}
+		return e, nil
+	}
+
+	boot := gunzip(xv6Image)
+	fs := gunzip(fsImage)
+	e := NewEmulator(0x7c00, 0x7c00, false, wasmWriter{}, map[uint64]string{})
+	copy(e.memory[0x7c00:], boot[:SectorSize])
+	e.io.hdds[0] = NewMemDisk(boot)
+	e.io.hdds[1] = NewMemDisk(fs)
+	return e, nil
+}
+
 func gunzip(data []byte) []byte {
 	r, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
@@ -71,13 +106,12 @@ func main() {
 		return nil
 	}))
 
-	boot := gunzip(xv6Image)
-	fs := gunzip(fsImage)
-
-	e := NewEmulator(0x7c00, 0x7c00, false, wasmWriter{}, map[uint64]string{})
-	copy(e.memory[0x7c00:], boot[:SectorSize])
-	e.io.hdds[0] = NewMemDisk(boot)
-	e.io.hdds[1] = NewMemDisk(fs)
+	e, err := newGuest()
+	if err != nil {
+		printf("%s\n", err.Error())
+		flush()
+		return
+	}
 
 	js.Global().Call("emuReady")
 
